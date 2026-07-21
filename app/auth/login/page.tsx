@@ -20,7 +20,7 @@ export default async function LoginPage({
       </form>
       <div className="auth-links">
         <Link href="/auth/forgot-password">Esqueci minha senha</Link>
-        <Link href="/auth/signup">Criar conta</Link>
+        <Link href={`/auth/signup?next=${encodeURIComponent(params.next ?? "/app")}`}>Criar conta</Link>
       </div>
     </div>
   );

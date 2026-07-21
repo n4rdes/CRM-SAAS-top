@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireWorkspace } from "@/lib/auth/workspace";
 import { assertActiveJobLimit, requireActiveSubscription } from "@/lib/subscriptions/server";
 import { isApplicationStage, isCompanyStage, isJobStatus } from "@/lib/domain/hr";
+import { canManageCrm, canManageRecruitment } from "@/lib/domain/team";
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -34,10 +35,19 @@ function requireAdmin(role: string, path: string) {
   if (!['owner', 'admin'].includes(role)) fail(path, "Somente proprietários e administradores podem excluir registros.");
 }
 
+function requireCrmOperator(role: string, path: string) {
+  if (!canManageCrm(role)) fail(path, "Sua função não permite alterar dados do CRM.");
+}
+
+function requireRecruitmentOperator(role: string, path: string) {
+  if (!canManageRecruitment(role)) fail(path, "Sua função não permite alterar vagas ou candidatos.");
+}
+
 export async function createCompany(formData: FormData) {
   const name = text(formData, "name");
   if (name.length < 2) fail("/app/clientes", "Informe o nome do cliente.");
-  const { supabase, tenant } = await requireActiveSubscription("/app/clientes");
+  const { supabase, tenant, membership } = await requireActiveSubscription("/app/clientes");
+  requireCrmOperator(membership.role, "/app/clientes");
   const { error } = await supabase.from("crm_companies").insert({
     tenant_id: tenant.id,
     name,
@@ -56,7 +66,8 @@ export async function updateCompany(formData: FormData) {
   const name = text(formData, "name");
   const stage = text(formData, "stage");
   if (!isUuid(id) || name.length < 2 || !isCompanyStage(stage)) fail(path, "Revise os dados do cliente.");
-  const { supabase, tenant } = await requireActiveSubscription(path);
+  const { supabase, tenant, membership } = await requireActiveSubscription(path);
+  requireCrmOperator(membership.role, path);
   const { error } = await supabase.from("crm_companies").update({ name, stage, email: text(formData, "email") || null, phone: text(formData, "phone") || null }).eq("id", id).eq("tenant_id", tenant.id);
   if (error) fail(path, friendlyDatabaseError(error, "Já existe um cliente com esses dados."));
   revalidateWorkspace();
@@ -79,7 +90,8 @@ export async function createCandidate(formData: FormData) {
   const fullName = text(formData, "full_name");
   const email = text(formData, "email").toLowerCase();
   if (fullName.length < 3 || !email) fail("/app/candidatos", "Informe nome e e-mail do candidato.");
-  const { supabase, tenant, user } = await requireActiveSubscription("/app/candidatos");
+  const { supabase, tenant, user, membership } = await requireActiveSubscription("/app/candidatos");
+  requireRecruitmentOperator(membership.role, "/app/candidatos");
   const { error } = await supabase.from("candidates").insert({ tenant_id: tenant.id, full_name: fullName, email, phone: text(formData, "phone") || null, source: text(formData, "source") || "manual", created_by: user.id });
   if (error) fail("/app/candidatos", friendlyDatabaseError(error, "Já existe um candidato com esse e-mail."));
   revalidateWorkspace();
@@ -92,7 +104,8 @@ export async function updateCandidate(formData: FormData) {
   const fullName = text(formData, "full_name");
   const email = text(formData, "email").toLowerCase();
   if (!isUuid(id) || fullName.length < 3 || !email) fail(path, "Revise os dados do candidato.");
-  const { supabase, tenant } = await requireActiveSubscription(path);
+  const { supabase, tenant, membership } = await requireActiveSubscription(path);
+  requireRecruitmentOperator(membership.role, path);
   const { error } = await supabase.from("candidates").update({ full_name: fullName, email, phone: text(formData, "phone") || null, source: text(formData, "source") || "manual" }).eq("id", id).eq("tenant_id", tenant.id);
   if (error) fail(path, friendlyDatabaseError(error, "Já existe um candidato com esse e-mail."));
   revalidateWorkspace();
@@ -114,7 +127,8 @@ export async function deleteCandidate(formData: FormData) {
 export async function createJob(formData: FormData) {
   const title = text(formData, "title");
   if (title.length < 2) fail("/app/vagas", "Informe o título da vaga.");
-  const { supabase, tenant, user } = await assertActiveJobLimit();
+  const { supabase, tenant, user, membership } = await assertActiveJobLimit();
+  requireRecruitmentOperator(membership.role, "/app/vagas");
   const companyId = text(formData, "company_id");
   const { error } = await supabase.from("jobs").insert({ tenant_id: tenant.id, title, company_id: isUuid(companyId) ? companyId : null, openings: Math.max(1, Number(text(formData, "openings")) || 1), status: "open", description: text(formData, "description") || null, created_by: user.id });
   if (error) fail("/app/vagas", "Não foi possível abrir a vaga.");
@@ -129,6 +143,7 @@ export async function updateJob(formData: FormData) {
   const status = text(formData, "status");
   if (!isUuid(id) || title.length < 2 || !isJobStatus(status)) fail(path, "Revise os dados da vaga.");
   const context = await requireActiveSubscription(path);
+  requireRecruitmentOperator(context.membership.role, path);
   const { data: current } = await context.supabase.from("jobs").select("status").eq("id", id).eq("tenant_id", context.tenant.id).single();
   if (current && !["open", "paused"].includes(current.status) && ["open", "paused"].includes(status)) await assertActiveJobLimit(path);
   const companyId = text(formData, "company_id");
@@ -155,7 +170,8 @@ export async function createApplication(formData: FormData) {
   const candidateId = text(formData, "candidate_id");
   const path = `/app/vagas/${jobId}`;
   if (!isUuid(jobId) || !isUuid(candidateId)) fail(path, "Escolha um candidato válido.");
-  const { supabase, tenant } = await requireActiveSubscription(path);
+  const { supabase, tenant, membership } = await requireActiveSubscription(path);
+  requireRecruitmentOperator(membership.role, path);
   const { error } = await supabase.from("applications").insert({ tenant_id: tenant.id, job_id: jobId, candidate_id: candidateId, stage: "applied" });
   if (error) fail(path, friendlyDatabaseError(error, "Esse candidato já está nesta vaga."));
   revalidateWorkspace();
@@ -168,7 +184,8 @@ export async function updateApplicationStage(formData: FormData) {
   const stage = text(formData, "stage");
   const path = `/app/vagas/${jobId}`;
   if (!isUuid(id) || !isUuid(jobId) || !isApplicationStage(stage)) fail(path, "Etapa inválida.");
-  const { supabase, tenant } = await requireActiveSubscription(path);
+  const { supabase, tenant, membership } = await requireActiveSubscription(path);
+  requireRecruitmentOperator(membership.role, path);
   const { error } = await supabase.from("applications").update({ stage }).eq("id", id).eq("job_id", jobId).eq("tenant_id", tenant.id);
   if (error) fail(path, "Não foi possível mover o candidato.");
   revalidateWorkspace();
@@ -180,7 +197,8 @@ export async function deleteApplication(formData: FormData) {
   const jobId = text(formData, "job_id");
   const path = `/app/vagas/${jobId}`;
   if (!isUuid(id) || !isUuid(jobId)) fail(path, "Candidatura inválida.");
-  const { supabase, tenant } = await requireActiveSubscription(path);
+  const { supabase, tenant, membership } = await requireActiveSubscription(path);
+  requireRecruitmentOperator(membership.role, path);
   const { error } = await supabase.from("applications").delete().eq("id", id).eq("job_id", jobId).eq("tenant_id", tenant.id);
   if (error) fail(path, "Não foi possível remover o candidato da vaga.");
   revalidateWorkspace();

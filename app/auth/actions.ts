@@ -19,8 +19,10 @@ async function getOrigin() {
   return `${protocol}://${host}`;
 }
 
-function authError(path: string, message: string) {
-  redirect(`${path}?error=${encodeURIComponent(message)}`);
+function authError(path: string, message: string, next?: string) {
+  const params = new URLSearchParams({ error: message });
+  if (next) params.set("next", safeNext(next));
+  redirect(`${path}?${params.toString()}`);
 }
 
 export async function signIn(formData: FormData) {
@@ -28,12 +30,12 @@ export async function signIn(formData: FormData) {
   const password = value(formData, "password");
   const next = safeNext(value(formData, "next"));
 
-  if (!email || !password) authError("/auth/login", "Informe e-mail e senha.");
+  if (!email || !password) authError("/auth/login", "Informe e-mail e senha.", next);
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-  if (error) authError("/auth/login", "E-mail ou senha inválidos.");
+  if (error) authError("/auth/login", "E-mail ou senha inválidos.", next);
   redirect(next);
 }
 
@@ -41,13 +43,14 @@ export async function signUp(formData: FormData) {
   const fullName = value(formData, "full_name");
   const email = value(formData, "email");
   const password = value(formData, "password");
+  const next = safeNext(value(formData, "next"));
   const plan = ["basic", "pro", "custom"].includes(value(formData, "plan"))
     ? value(formData, "plan")
     : "basic";
 
-  if (fullName.length < 3) authError("/auth/signup", "Informe seu nome completo.");
+  if (fullName.length < 3) authError("/auth/signup", "Informe seu nome completo.", next);
   if (!email || password.length < 8) {
-    authError("/auth/signup", "Use um e-mail válido e uma senha com pelo menos 8 caracteres.");
+    authError("/auth/signup", "Use um e-mail válido e uma senha com pelo menos 8 caracteres.", next);
   }
 
   const supabase = await createClient();
@@ -57,13 +60,13 @@ export async function signUp(formData: FormData) {
     password,
     options: {
       data: { full_name: fullName, selected_plan: plan },
-      emailRedirectTo: `${origin}/auth/callback?next=/onboarding`,
+      emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
     },
   });
 
-  if (error) authError("/auth/signup", error.message);
+  if (error) authError("/auth/signup", error.message, next);
   if (!data.session) redirect(`/auth/check-email?email=${encodeURIComponent(email)}`);
-  redirect("/onboarding");
+  redirect(next);
 }
 
 export async function requestPasswordReset(formData: FormData) {

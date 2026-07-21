@@ -36,7 +36,8 @@ export async function updateSession(request: NextRequest) {
 
   if (user && ["/auth/login", "/auth/signup"].includes(request.nextUrl.pathname)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/app";
+    const requestedNext = request.nextUrl.searchParams.get("next") ?? "/app";
+    url.pathname = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/app";
     url.search = "";
     return NextResponse.redirect(url);
   }
