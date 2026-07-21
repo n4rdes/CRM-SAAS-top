@@ -1,0 +1,26 @@
+export const BILLING_PLAN_CODES = ["basic", "pro"] as const;
+
+export type BillingPlanCode = (typeof BILLING_PLAN_CODES)[number];
+
+export function isBillingPlanCode(value: string): value is BillingPlanCode {
+  return BILLING_PLAN_CODES.includes(value as BillingPlanCode);
+}
+
+export function getAppUrl() {
+  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+}
+
+export function getStripePriceId(planCode: BillingPlanCode) {
+  return planCode === "basic" ? process.env.STRIPE_BASIC_PRICE_ID : process.env.STRIPE_PRO_PRICE_ID;
+}
+
+export function getPlanCodeFromPriceId(priceId: string | null | undefined): BillingPlanCode | null {
+  if (!priceId) return null;
+  if (priceId === process.env.STRIPE_BASIC_PRICE_ID) return "basic";
+  if (priceId === process.env.STRIPE_PRO_PRICE_ID) return "pro";
+  return null;
+}
+
+export function isStripeConfigured() {
+  return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_BASIC_PRICE_ID && process.env.STRIPE_PRO_PRICE_ID);
+}

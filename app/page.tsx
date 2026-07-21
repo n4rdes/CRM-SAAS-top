@@ -203,9 +203,26 @@ function DashboardMock() {
 
 function ContactModal({ onClose }: { onClose: () => void }) {
   const [submitted, setSubmitted] = useState(false);
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitted(true);
+    setSubmitting(true);
+    setSubmitError("");
+    const form = new FormData(event.currentTarget);
+    const query = new URLSearchParams(window.location.search);
+    try {
+      const response = await fetch("/api/leads", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+        name: form.get("name"), email: form.get("email"), company: form.get("company"), company_size: form.get("company_size"), objective: form.get("objective"), website: form.get("website"),
+        attribution: { utm_source: query.get("utm_source") ?? "", utm_medium: query.get("utm_medium") ?? "", utm_campaign: query.get("utm_campaign") ?? "" },
+      }) });
+      if (!response.ok) throw new Error("LEAD_REQUEST_FAILED");
+      setSubmitted(true);
+    } catch {
+      setSubmitError("Não conseguimos registrar agora. Tente novamente em instantes.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -217,7 +234,7 @@ function ContactModal({ onClose }: { onClose: () => void }) {
             <span><Icon name="check" size={28} /></span>
             <p className="eyebrow">Tudo certo</p>
             <h2 id="contact-title">Seu interesse foi registrado.</h2>
-            <p>Na versão comercial, este contato entra automaticamente no CRM com origem, plano e campanha de aquisição.</p>
+            <p>Recebemos seus dados e sua empresa já entrou na fila de contato comercial.</p>
             <a className="button primary" href="/demo">Explorar o produto <Icon name="arrow" /></a>
           </div>
         ) : (
@@ -226,14 +243,16 @@ function ContactModal({ onClose }: { onClose: () => void }) {
             <h2 id="contact-title">Conte um pouco sobre sua operação.</h2>
             <p>Preencha os dados para receber uma demonstração direcionada ao seu cenário.</p>
             <form onSubmit={submit}>
+              <input className="form-honeypot" tabIndex={-1} autoComplete="off" name="website" aria-hidden="true" />
               <label>Nome completo<input required name="name" placeholder="Como podemos chamar você?" /></label>
               <label>E-mail corporativo<input required type="email" name="email" placeholder="voce@empresa.com.br" /></label>
               <div className="form-row">
                 <label>Empresa<input required name="company" placeholder="Nome da empresa" /></label>
-                <label>Tamanho<select defaultValue=""><option value="" disabled>Colaboradores</option><option>Até 50</option><option>51 a 200</option><option>201 a 500</option><option>Mais de 500</option></select></label>
+                <label>Tamanho<select name="company_size" required defaultValue=""><option value="" disabled>Colaboradores</option><option>Até 50</option><option>51 a 200</option><option>201 a 500</option><option>Mais de 500</option></select></label>
               </div>
-              <label>Principal objetivo<select defaultValue=""><option value="" disabled>Selecione uma opção</option><option>Organizar CRM e clientes</option><option>Melhorar recrutamento e seleção</option><option>Centralizar RH e dados de pessoas</option><option>Substituir várias ferramentas</option></select></label>
-              <button className="button primary wide" type="submit">Solicitar demonstração <Icon name="arrow" /></button>
+              <label>Principal objetivo<select name="objective" required defaultValue=""><option value="" disabled>Selecione uma opção</option><option>Organizar CRM e clientes</option><option>Melhorar recrutamento e seleção</option><option>Centralizar RH e dados de pessoas</option><option>Substituir várias ferramentas</option></select></label>
+              {submitError && <small className="form-submit-error">{submitError}</small>}
+              <button className="button primary wide" type="submit" disabled={submitting}>{submitting ? "Enviando..." : <>Solicitar demonstração <Icon name="arrow" /></>}</button>
               <small>Ao enviar, você concorda em receber contato sobre o Prismae.</small>
             </form>
           </>
@@ -244,7 +263,6 @@ function ContactModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function Home() {
-  const [annual, setAnnual] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
 
@@ -393,14 +411,13 @@ export default function Home() {
           <p className="eyebrow">Planos que acompanham o crescimento</p>
           <h2>Comece com o essencial. Evolua sem trocar de sistema.</h2>
           <p>Os valores abaixo são a proposta comercial inicial para validação do produto.</p>
-          <div className="billing-toggle"><button className={!annual ? "active" : ""} onClick={() => setAnnual(false)}>Mensal</button><button className={annual ? "active" : ""} onClick={() => setAnnual(true)}>Anual <span>2 meses grátis</span></button></div>
         </div>
         <div className="pricing-grid">
           {plans.map((plan) => (
             <article key={plan.id} className={plan.popular ? "popular" : ""}>
               {plan.popular && <div className="popular-label">Mais escolhido</div>}
               <h3>{plan.name}</h3><p>{plan.description}</p>
-              {plan.custom ? <div className="price custom-price"><strong>Sob consulta</strong><small>projeto e volume personalizados</small></div> : <div className="price"><small>R$</small><strong>{annual ? plan.annual : plan.monthly}</strong><span>/mês</span><em>{annual ? 'cobrado anualmente' : 'cobrança mensal'}</em></div>}
+              {plan.custom ? <div className="price custom-price"><strong>Sob consulta</strong><small>projeto e volume personalizados</small></div> : <div className="price"><small>R$</small><strong>{plan.monthly}</strong><span>/mês</span><em>cobrança mensal</em></div>}
               {plan.custom ? (
                 <button className="button wide secondary" onClick={() => setContactOpen(true)}>Falar com especialista <Icon name="arrow" /></button>
               ) : (
@@ -436,7 +453,7 @@ export default function Home() {
         <div><b>Produto</b><a href="#solucoes">Módulos</a><a href="/demo">Demonstração</a><a href="#precos">Planos</a><a href="#seguranca">Segurança</a></div>
         <div><b>Soluções</b><a href="#solucoes">Consultorias de RH</a><a href="#solucoes">RH interno</a><a href="#solucoes">Grandes empresas</a><a href="#solucoes">White label</a></div>
         <div><b>Empresa</b><button onClick={() => setContactOpen(true)}>Contato</button><a href="#inicio">Privacidade</a><a href="#inicio">Termos</a></div>
-        <small>© 2026 Prismae People OS. Produto em desenvolvimento.</small>
+        <small>© 2026 Prismae People OS. Todos os direitos reservados.</small>
       </footer>
 
       {contactOpen && <ContactModal onClose={() => setContactOpen(false)} />}
