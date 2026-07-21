@@ -13,7 +13,9 @@ Esta entrega contém quatro experiências:
 ## Configurar o Supabase
 
 1. No painel do Supabase, abra **SQL Editor > New query**.
-2. Copie todo o conteúdo de `supabase/migrations/202607210001_foundation.sql`, cole e clique em **Run**.
+2. Execute, nesta ordem, todo o conteúdo de:
+   - `supabase/migrations/202607210001_foundation.sql` — estrutura, planos e RLS;
+   - `supabase/migrations/202607210002_audit_triggers.sql` — histórico automático de alterações.
 3. Em **Authentication > URL Configuration**, use `http://localhost:3000` como Site URL e adicione `http://localhost:3000/**` em Redirect URLs.
 4. Copie `.env.example` para `.env.local` e preencha a API URL e a Publishable key. Nunca coloque a Secret key em variável `NEXT_PUBLIC_*`.
 
@@ -54,4 +56,6 @@ npm.cmd run build
 
 ## Estado da entrega
 
-Login, banco multiempresa, RLS, onboarding e os cadastros iniciais estão implementados. A demonstração continua separada da aplicação real. Checkout, webhooks de cobrança, convites de equipe, e-mail transacional, módulos avançados, domínio e documentos jurídicos ainda fazem parte das próximas fases antes do lançamento comercial.
+Login, banco multiempresa, RLS, onboarding, assinatura de teste, CRM, banco de candidatos e ATS estão implementados. A aplicação real permite pesquisar, filtrar, editar e excluir registros, vincular candidatos às vagas e movimentá-los pelo pipeline de recrutamento, com limite de vagas ativas por plano e histórico automático de alterações. A demonstração continua separada da aplicação real.
+
+Checkout, webhooks de cobrança, convites de equipe, e-mail transacional, módulos avançados, domínio e documentos jurídicos ainda fazem parte das próximas fases antes do lançamento comercial.
