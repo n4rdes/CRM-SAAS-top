@@ -261,7 +261,7 @@ export default function Home() {
           <a href="#seguranca" onClick={() => setMenuOpen(false)}>Segurança</a>
         </nav>
         <div className="header-actions">
-          <a href="/demo" className="login-link">Entrar</a>
+          <a href="/auth/login" className="login-link">Entrar</a>
           <button className="button primary small" onClick={() => setContactOpen(true)}>Solicitar demonstração</button>
         </div>
       </header>
@@ -401,7 +401,11 @@ export default function Home() {
               {plan.popular && <div className="popular-label">Mais escolhido</div>}
               <h3>{plan.name}</h3><p>{plan.description}</p>
               {plan.custom ? <div className="price custom-price"><strong>Sob consulta</strong><small>projeto e volume personalizados</small></div> : <div className="price"><small>R$</small><strong>{annual ? plan.annual : plan.monthly}</strong><span>/mês</span><em>{annual ? 'cobrado anualmente' : 'cobrança mensal'}</em></div>}
-              <button className={`button wide ${plan.popular ? "primary" : "secondary"}`} onClick={() => setContactOpen(true)}>{plan.custom ? "Falar com especialista" : `Começar no ${plan.name}`} <Icon name="arrow" /></button>
+              {plan.custom ? (
+                <button className="button wide secondary" onClick={() => setContactOpen(true)}>Falar com especialista <Icon name="arrow" /></button>
+              ) : (
+                <a className={`button wide ${plan.popular ? "primary" : "secondary"}`} href={`/auth/signup?plan=${plan.id}`}>Começar no {plan.name} <Icon name="arrow" /></a>
+              )}
               <ul>{plan.features.map((feature) => <li key={feature}><span><Icon name="check" size={15} /></span>{feature}</li>)}</ul>
             </article>
           ))}
