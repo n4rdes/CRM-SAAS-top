@@ -5,12 +5,11 @@ import Link from "next/link";
 import { formatBRL, PLAN_CATALOG } from "@/lib/subscriptions";
 import "./demo.css";
 
-type Panel = "overview" | "crm" | "jobs" | "candidates" | "people" | "performance" | "engagement" | "automations" | "reports" | "subscription" | "security";
+type Panel = "overview" | "central" | "crm" | "jobs" | "candidates" | "people" | "timeoff" | "performance" | "engagement" | "automations" | "reports" | "subscription" | "security";
 
 const navGroups: { label: string; items: { id: Panel; label: string; icon: string; badge?: string }[] }[] = [
-  { label: "Principal", items: [{ id: "overview", label: "Visão geral", icon: "⌂" }, { id: "crm", label: "Comercial", icon: "◎", badge: "8" }] },
-  { label: "Talentos", items: [{ id: "jobs", label: "Vagas e processos", icon: "▱", badge: "12" }, { id: "candidates", label: "Candidatos", icon: "◉" }] },
-  { label: "Gestão de pessoas", items: [{ id: "people", label: "Colaboradores", icon: "♙" }, { id: "performance", label: "Desempenho e PDI", icon: "◇" }, { id: "engagement", label: "Clima e engajamento", icon: "♡" }] },
+  { label: "Operação", items: [{ id: "overview", label: "Visão geral", icon: "⌂" }, { id: "central", label: "Central de trabalho", icon: "▣", badge: "4" }, { id: "crm", label: "Clientes", icon: "◎", badge: "8" }, { id: "jobs", label: "Vagas", icon: "▱", badge: "12" }, { id: "candidates", label: "Candidatos", icon: "◉" }] },
+  { label: "Gestão de pessoas", items: [{ id: "people", label: "Pessoas", icon: "♙" }, { id: "timeoff", label: "Férias & ausências", icon: "□" }, { id: "performance", label: "Desempenho", icon: "◇" }, { id: "engagement", label: "Clima & engajamento", icon: "♡" }] },
   { label: "Inteligência", items: [{ id: "automations", label: "Automações", icon: "⎇" }, { id: "reports", label: "Relatórios", icon: "▤" }] },
   { label: "Conta", items: [{ id: "subscription", label: "Plano e assinatura", icon: "◇" }, { id: "security", label: "Segurança e auditoria", icon: "⌾" }] },
 ];
@@ -26,10 +25,12 @@ const candidatesBase = [
 
 const panelMeta: Record<Panel, { eyebrow: string; title: string; description: string }> = {
   overview: { eyebrow: "Operação em tempo real", title: "Bom dia, Ana 👋", description: "Aqui está o que merece sua atenção hoje." },
+  central: { eyebrow: "Central de trabalho", title: "O que precisa de você", description: "Notificações, aprovações, prazos e riscos reunidos por prioridade." },
   crm: { eyebrow: "CRM para consultorias", title: "Pipeline comercial", description: "Acompanhe oportunidades, propostas, contratos e receita prevista." },
   jobs: { eyebrow: "ATS colaborativo", title: "Vagas e processos seletivos", description: "Gerencie o funil, os SLAs e a comunicação de cada vaga." },
   candidates: { eyebrow: "Banco de talentos", title: "Candidatos", description: "Uma base pesquisável, atualizada e reutilizável em qualquer processo." },
   people: { eyebrow: "Jornada do colaborador", title: "Pessoas", description: "Documentos, contratos, férias e histórico em uma linha do tempo única." },
+  timeoff: { eyebrow: "RH operacional", title: "Férias & ausências", description: "Políticas, saldos, aprovações e calendário da equipe em uma única operação." },
   performance: { eyebrow: "Talento e sucessão", title: "Desempenho e desenvolvimento", description: "Ciclos, metas, 1:1, PDI, competências e matriz 9-box." },
   engagement: { eyebrow: "Escuta contínua", title: "Clima e engajamento", description: "Transforme pesquisas e feedbacks em planos de ação mensuráveis." },
   automations: { eyebrow: "Operação sem retrabalho", title: "Automações", description: "Gatilhos, condições e ações para manter cada processo em movimento." },
@@ -96,6 +97,32 @@ function Overview({ onNavigate }: { onNavigate: (panel: Panel) => void }) {
       </article>
     </section>
   </>;
+}
+
+function WorkCenter() {
+  const notifications = [
+    ["Nova solicitação de férias", "Júlia Ferreira pediu 5 dias a partir de 03/08.", "há 12 min", "action"],
+    ["Vaga fora do SLA", "Analista de Dados aguarda retorno do gestor há 3 dias.", "há 38 min", "warning"],
+    ["Onboarding concluído", "Rafael Souza finalizou todas as tarefas da jornada.", "há 2 h", "success"],
+    ["Documento perto do vencimento", "O exame ocupacional de Laura vence em 18 dias.", "ontem", "info"],
+  ];
+  const priorities = [
+    ["Atrasos", "7 atividades fora do prazo", "Abrir agenda", "red"],
+    ["Aprovações", "4 ausências aguardando decisão", "Revisar férias", "blue"],
+    ["Documentos", "12 vencimentos nos próximos 30 dias", "Ver pessoas", "coral"],
+    ["Jornadas", "6 tarefas de onboarding próximas do prazo", "Acompanhar", "green"],
+  ];
+  return <><section className="demo-work-center-hero"><div><span>4</span><p><b>notificações novas</b><small>direcionadas para você</small></p></div><div><span>29</span><p><b>pendências operacionais</b><small>ordenadas por risco e prazo</small></p></div><button>Organizar agenda →</button></section><section className="demo-work-center-layout"><article className="panel demo-notification-inbox"><div className="panel-title"><div><span>Caixa de entrada</span><h3>Atualizações importantes</h3></div><button>Marcar tudo como lido</button></div>{notifications.map(([title,body,time,kind])=><div className="demo-notification-row" key={title}><i className={kind}>{kind === "success" ? "✓" : kind === "warning" ? "!" : kind === "action" ? "→" : "i"}</i><p><b>{title}</b><span>{body}</span><small>{time}</small></p><button>Abrir</button></div>)}</article><aside className="demo-priority-grid">{priorities.map(([title,copy,action,color])=><article className="panel demo-priority-card" key={title}><header><i className={color}>!</i><div><h3>{title}</h3><p>{copy}</p></div></header><button>{action} →</button></article>)}</aside></section></>;
+}
+
+function TimeOff() {
+  const days = ["Qua 22", "Qui 23", "Sex 24", "Sáb 25", "Dom 26", "Seg 27", "Ter 28"];
+  const requests = [
+    ["Júlia Ferreira", "Férias", "03 ago — 07 ago", "5 dias", "JF", "Pendente"],
+    ["Carlos Almeida", "Folga compensatória", "31 jul", "1 dia", "CA", "Aprovada"],
+    ["Laura Martins", "Afastamento médico", "22 jul — 24 jul", "3 dias", "LM", "Aprovada"],
+  ];
+  return <><section className="demo-metrics compact"><Metric label="Aguardando aprovação" value="4" change="2 novas" accent="coral" note="desde ontem"/><Metric label="Ausentes hoje" value="3" change="2,3%" accent="violet" note="do headcount"/><Metric label="Próximas saídas" value="8" change="5 períodos" note="já aprovados"/><Metric label="Dias aprovados em 2026" value="184" change="12,4%" accent="green" note="vs. ano anterior"/></section><section className="demo-timeoff-layout"><article className="panel demo-team-calendar"><div className="panel-title"><div><span>Disponibilidade</span><h3>Calendário da equipe</h3></div><button>Próximos 14 dias⌄</button></div><div>{days.map((day,index)=><section className={index===0?"today":""} key={day}><header><b>{day}</b>{index===0&&<small>Hoje</small>}</header>{index===0&&<span className="coral"><b>Laura M.</b><small>Afastamento</small></span>}{index===1&&<span className="coral"><b>Laura M.</b><small>Afastamento</small></span>}{index===2&&<span className="coral"><b>Laura M.</b><small>Afastamento</small></span>}{index===5&&<span className="blue"><b>Carlos A.</b><small>Folga</small></span>}{![0,1,2,5].includes(index)&&<em>Livre</em>}</section>)}</div></article><article className="panel demo-leave-balance"><div className="panel-title"><div><span>Seu saldo</span><h3>Férias disponíveis</h3></div></div><strong>18,5 <small>dias</small></strong><i><b style={{width:"62%"}}/></i><p>30 dias de direito · 10 usados · 1,5 pendentes</p><button className="primary-action">＋ Nova solicitação</button></article></section><section className="panel demo-leave-requests"><div className="panel-title"><div><span>Fluxo de aprovação</span><h3>Solicitações recentes</h3></div><button>Ver histórico</button></div>{requests.map(([name,type,date,total,initials,status],index)=><div key={name}><Avatar initials={initials} color={["violet","blue","coral"][index]}/><p><b>{name}</b><span>{type} · {date}</span></p><strong>{total}</strong><em className={status==="Pendente"?"pending":"approved"}>{status}</em>{status==="Pendente"?<span><button>Rejeitar</button><button>Aprovar</button></span>:<button>•••</button>}</div>)}</section></>;
 }
 
 const crmColumns = [
@@ -283,11 +310,10 @@ export default function DemoPage() {
   const [active,setActive]=useState<Panel>("overview"); const [sidebarOpen,setSidebarOpen]=useState(false); const [aiOpen,setAiOpen]=useState(false); const [addOpen,setAddOpen]=useState(false); const [toast,setToast]=useState(""); const [candidates,setCandidates]=useState(candidatesBase);
   const go=(panel:Panel)=>{setActive(panel);setSidebarOpen(false);window.scrollTo({top:0,behavior:'smooth'})};
   const saveCandidate=(candidate:typeof candidatesBase[number])=>{setCandidates(current=>[candidate,...current]);setAddOpen(false);setToast(`${candidate.name} foi adicionado ao banco de talentos.`);setTimeout(()=>setToast(''),3200)};
-  const render=()=>{switch(active){case'overview':return <Overview onNavigate={go}/>;case'crm':return <CRM/>;case'jobs':return <Jobs/>;case'candidates':return <Candidates candidates={candidates} onAdd={()=>setAddOpen(true)}/>;case'people':return <People/>;case'performance':return <Performance/>;case'engagement':return <Engagement/>;case'automations':return <Automations/>;case'reports':return <Reports/>;case'subscription':return <Subscription/>;case'security':return <Security/>;}};
+  const render=()=>{switch(active){case'overview':return <Overview onNavigate={go}/>;case'central':return <WorkCenter/>;case'crm':return <CRM/>;case'jobs':return <Jobs/>;case'candidates':return <Candidates candidates={candidates} onAdd={()=>setAddOpen(true)}/>;case'people':return <People/>;case'timeoff':return <TimeOff/>;case'performance':return <Performance/>;case'engagement':return <Engagement/>;case'automations':return <Automations/>;case'reports':return <Reports/>;case'subscription':return <Subscription/>;case'security':return <Security/>;}};
   return <main className="demo-app">
-    <aside className={`demo-sidebar ${sidebarOpen?'open':''}`}><div className="sidebar-head"><Logo/><button onClick={()=>setSidebarOpen(false)}>×</button></div><div className="company-switch"><span>DM</span><div><b>DM Gestão</b><small>Plano Pro · Avaliação</small></div><button>⌄</button></div><nav>{navGroups.map(group=><div key={group.label}><small>{group.label}</small>{group.items.map(item=><button key={item.id} className={active===item.id?'active':''} onClick={()=>go(item.id)}><i>{item.icon}</i><span>{item.label}</span>{item.badge&&<em>{item.badge}</em>}</button>)}</div>)}</nav><div className="sidebar-upgrade"><span>✦</span><div><b>11 dias de avaliação</b><small>Configure a cobrança para manter o plano Pro.</small></div><button onClick={()=>go('subscription')}>Ver assinatura</button></div><Link className="back-site" href="/">← Voltar para o site</Link></aside>
-    <div className="demo-workspace"><header className="demo-topbar"><button className="sidebar-toggle" onClick={()=>setSidebarOpen(true)}>☰</button><div className="global-search">⌕<input placeholder="Buscar clientes, vagas, candidatos ou pessoas…"/><kbd>⌘ K</kbd></div><div className="top-actions"><button title="Ajuda">?</button><button className="notification" title="Notificações">♢<i>4</i></button><button className="new-button" onClick={()=>active==='candidates'?setAddOpen(true):setToast('Menu de criação rápida aberto.')}>＋ Novo</button><button className="profile"><Avatar initials="AM"/><span><b>Ana Moraes</b><small>Administrador</small></span>⌄</button></div></header><div className="demo-page-head"><div><p>{panelMeta[active].eyebrow}</p><h1>{panelMeta[active].title}</h1><span>{panelMeta[active].description}</span></div><div><button className="ghost-action">⇩ Exportar</button><button className="ai-action" onClick={()=>setAiOpen(true)}>✦ Perguntar à IA</button></div></div><div className="demo-content">{render()}</div></div>
-    <button className="floating-ai" onClick={()=>setAiOpen(true)} aria-label="Abrir assistente Prismae">✦<span>IA</span></button>
+    <aside className={`demo-sidebar ${sidebarOpen?'open':''}`}><div className="sidebar-head"><Logo/><button onClick={()=>setSidebarOpen(false)}>×</button></div><div className="company-switch"><span>DM</span><div><small>AMBIENTE ATUAL</small><b>DM Gestão</b><em>Administrador</em></div></div><nav>{navGroups.map(group=><div key={group.label}><small>{group.label}</small>{group.items.map(item=><button key={item.id} className={active===item.id?'active':''} onClick={()=>go(item.id)}><i>{item.icon}</i><span>{item.label}</span>{item.badge&&<em>{item.badge}</em>}</button>)}</div>)}</nav><div className="demo-sidebar-footer"><Avatar initials="AM"/><span><b>Ana Moraes</b><small>ana@dmgestao.com.br</small></span><Link href="/">Sair da demo</Link></div></aside>
+    <div className="demo-workspace"><header className="demo-topbar"><button className="sidebar-toggle" onClick={()=>setSidebarOpen(true)}>☰</button><div className="demo-topbar-context"><small>PRISMAE PEOPLE OS</small><strong>DM Gestão</strong></div><div className="top-actions"><button className="new-button" onClick={()=>setToast('Nova atividade aberta na agenda.')}>＋ Nova atividade</button><button className="notification" title="Notificações" onClick={()=>go('central')}>♢<i>4</i></button><button className="demo-plan-button" onClick={()=>go('subscription')}>Plano Pro</button><Avatar initials="AM"/></div></header><div className="demo-page-head"><div><p>{panelMeta[active].eyebrow}</p><h1>{panelMeta[active].title}</h1><span>{panelMeta[active].description}</span></div><div>{active==='reports'&&<button className="ghost-action">⇩ Exportar planilha</button>}{active==='candidates'&&<button className="ai-action" onClick={()=>setAddOpen(true)}>＋ Novo candidato</button>}{active==='overview'&&<button className="ai-action" onClick={()=>setAiOpen(true)}>✦ Consultar operação</button>}</div></div><div className="demo-content">{render()}</div></div>
     {aiOpen&&<><div className="drawer-backdrop" onClick={()=>setAiOpen(false)}/><AIAssistant onClose={()=>setAiOpen(false)}/></>}
     {addOpen&&<AddCandidateModal onClose={()=>setAddOpen(false)} onSave={saveCandidate}/>} {toast&&<div className="demo-toast"><span>✓</span>{toast}</div>}
   </main>;

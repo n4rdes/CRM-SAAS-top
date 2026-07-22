@@ -35,12 +35,12 @@ O primeiro nicho é o melhor ponto de entrada porque sente simultaneamente a dor
 | CRM comercial | Contas, contatos, pipeline, propostas, contratos, atividades, SLA, forecast, comissão e rentabilidade |
 | ATS | Vagas, requisições, página de carreiras, formulários progressivos, funil, scorecards, entrevistas, proposta e banco de talentos |
 | Portal do cliente | Abertura de vaga, alinhamento de perfil, feedback de shortlist, aprovações, documentos e indicadores |
-| Pessoas | Cadastro, dependentes, documentos privados, contratos, férias, afastamentos, benefícios e linha do tempo |
+| Pessoas | Cadastro, documentos privados, contratos, férias, afastamentos, políticas, saldos e linha do tempo |
 | Onboarding/offboarding | Checklists, responsáveis, prazos, aceite, entrega de ativos e pesquisa de experiência |
 | Desempenho | Ciclos, metas, competências, 1:1, feedbacks, PDI, calibração, 9-box e sucessão |
 | Clima | eNPS, pesquisas pulso, reconhecimento e planos de ação |
-| Automações | Gatilhos, condições, aprovações, e-mails, tarefas, webhooks e alertas de SLA |
-| People Analytics | Time to hire, conversão, custo, diversidade, turnover, retenção, receita por recrutador e qualidade por origem |
+| Automações | Gatilhos de contratação, admissão e ausência, tarefas, notificações e histórico; e-mails e webhooks na evolução |
+| People Analytics | Dashboards por usuário, filtros por data, exportação para planilhas, time to hire, conversão, headcount, metas, clima e ausências |
 | IA Prismae | Resumo, busca semântica, comparação, riscos, rascunhos e recomendações com fontes e permissão |
 | Administração | Usuários, equipes, funções, campos personalizados, auditoria, LGPD, integrações e assinatura |
 
@@ -80,4 +80,3 @@ Multi-CNPJ, SSO/SAML, SCIM, white label, data residency, SLAs, BI avançado e ma
 - uso: vagas/usuário, automações executadas, clientes ativos e relatórios acessados;
 - valor: time to hire, SLA, conversão, receita por recrutador e retenção de contratados;
 - negócio: MRR, expansão, churn de logo, churn de receita e margem por plano.
-
