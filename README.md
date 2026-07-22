@@ -17,7 +17,8 @@ Esta entrega contém quatro experiências:
    - `supabase/migrations/202607210001_foundation.sql` — estrutura, planos e RLS;
    - `supabase/migrations/202607210002_audit_triggers.sql` — histórico automático de alterações;
    - `supabase/migrations/202607210003_team_billing.sql` — equipe, permissões, leads e cobrança;
-   - `supabase/migrations/202607210004_operations_analytics.sql` — contatos, agenda, avaliações e histórico do ATS.
+   - `supabase/migrations/202607210004_operations_analytics.sql` — contatos, agenda, avaliações e histórico do ATS;
+   - `supabase/migrations/202607220005_people_core.sql` — Pessoas, estrutura organizacional, documentos e jornadas.
 3. Em **Authentication > URL Configuration**, use `http://localhost:3000` como Site URL e adicione `http://localhost:3000/**` em Redirect URLs.
 4. Copie `.env.example` para `.env.local` e preencha a API URL e a Publishable key. Para leads e cobrança, configure também a Secret key do Supabase e as variáveis do Stripe. Nunca coloque chaves secretas em variável `NEXT_PUBLIC_*`.
 
@@ -59,6 +60,6 @@ npm.cmd run build
 
 ## Estado da entrega
 
-Login, banco multiempresa, RLS, onboarding, assinatura de teste, CRM com contatos, banco de candidatos, ATS, avaliações estruturadas, histórico de etapas, agenda, relatórios, equipe, papéis de acesso, convites e configurações estão implementados. A aplicação valida limites de usuários e vagas por plano, registra auditoria, capta leads do site e possui checkout, portal do cliente e webhooks do Stripe prontos para configuração. A demonstração continua separada da aplicação real.
+Login, banco multiempresa, RLS, onboarding, assinatura de teste, CRM com contatos, banco de candidatos, ATS, avaliações estruturadas, histórico de etapas, agenda, Pessoas, departamentos, cargos, documentos privados, onboarding/offboarding, relatórios, equipe, papéis de acesso, convites e configurações estão implementados. A aplicação converte candidatos contratados em colaboradores sem duplicação, valida limites por plano, registra auditoria, capta leads do site e possui checkout, portal de cobrança e webhooks do Stripe prontos para configuração. A demonstração continua separada da aplicação real.
 
 E-mail transacional, módulos avançados de pessoas, domínio, hospedagem e revisão dos documentos jurídicos ainda fazem parte das próximas fases antes do lançamento comercial.
