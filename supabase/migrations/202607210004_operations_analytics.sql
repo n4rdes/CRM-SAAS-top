@@ -40,6 +40,20 @@ create table if not exists public.activities (
 create index if not exists activities_agenda_idx on public.activities(tenant_id, completed_at, due_at);
 create index if not exists activities_entity_idx on public.activities(tenant_id, entity_type, entity_id, created_at desc);
 
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'applications_tenant_id_id_key'
+      and conrelid = 'public.applications'::regclass
+  ) then
+    alter table public.applications
+      add constraint applications_tenant_id_id_key unique (tenant_id, id);
+  end if;
+end
+$$;
+
 create table if not exists public.application_reviews (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
