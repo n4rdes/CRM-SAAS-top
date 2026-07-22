@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireWorkspace } from "@/lib/auth/workspace";
 import { assertActiveJobLimit, requireActiveSubscription } from "@/lib/subscriptions/server";
-import { isApplicationStage, isCompanyStage, isJobStatus } from "@/lib/domain/hr";
+import { isActivityType, isApplicationStage, isCompanyStage, isJobStatus, isReviewRecommendation } from "@/lib/domain/hr";
 import { canManageCrm, canManageRecruitment } from "@/lib/domain/team";
 
 function text(formData: FormData, key: string) {
@@ -21,6 +21,17 @@ function fail(path: string, message: string): never {
 
 function done(path: string, message: string): never {
   redirect(`${path}?success=${encodeURIComponent(message)}`);
+}
+
+function returnPath(formData: FormData, fallback: string) {
+  const path = text(formData, "return_path");
+  return path.startsWith("/app") && !path.startsWith("//") ? path : fallback;
+}
+
+function optionalDate(value: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function friendlyDatabaseError(error: { code?: string; message: string }, duplicateMessage: string) {
@@ -203,4 +214,112 @@ export async function deleteApplication(formData: FormData) {
   if (error) fail(path, "Não foi possível remover o candidato da vaga.");
   revalidateWorkspace();
   done(path, "Candidato removido do processo seletivo.");
+}
+
+export async function createCompanyContact(formData: FormData) {
+  const companyId = text(formData, "company_id");
+  const path = `/app/clientes/${companyId}`;
+  const fullName = text(formData, "full_name");
+  if (!isUuid(companyId) || fullName.length < 2) fail(path, "Informe o nome do contato.");
+  const { supabase, tenant, user, membership } = await requireActiveSubscription(path);
+  requireCrmOperator(membership.role, path);
+  const { error } = await supabase.from("crm_contacts").insert({
+    tenant_id: tenant.id,
+    company_id: companyId,
+    full_name: fullName,
+    job_title: text(formData, "job_title") || null,
+    email: text(formData, "email") || null,
+    phone: text(formData, "phone") || null,
+    decision_maker: formData.get("decision_maker") === "on",
+    notes: text(formData, "notes") || null,
+    created_by: user.id,
+  });
+  if (error) fail(path, "Não foi possível cadastrar o contato. Execute a migração 004 no Supabase.");
+  revalidateWorkspace();
+  done(path, "Contato adicionado ao cliente.");
+}
+
+export async function deleteCompanyContact(formData: FormData) {
+  const id = text(formData, "contact_id");
+  const companyId = text(formData, "company_id");
+  const path = `/app/clientes/${companyId}`;
+  if (!isUuid(id) || !isUuid(companyId)) fail(path, "Contato inválido.");
+  const { supabase, tenant, membership } = await requireActiveSubscription(path);
+  requireCrmOperator(membership.role, path);
+  const { error } = await supabase.from("crm_contacts").delete().eq("id", id).eq("company_id", companyId).eq("tenant_id", tenant.id);
+  if (error) fail(path, "Não foi possível remover o contato.");
+  revalidateWorkspace();
+  done(path, "Contato removido.");
+}
+
+export async function createActivity(formData: FormData) {
+  const path = returnPath(formData, "/app/agenda");
+  const subject = text(formData, "subject");
+  const activityType = text(formData, "activity_type");
+  const entityType = text(formData, "entity_type") || "general";
+  const entityId = text(formData, "entity_id");
+  if (subject.length < 2 || !isActivityType(activityType)) fail(path, "Informe o assunto e o tipo da atividade.");
+  if (!["general", "company", "candidate", "job", "application"].includes(entityType)) fail(path, "Vínculo da atividade inválido.");
+  const { supabase, tenant, user } = await requireActiveSubscription(path);
+  const { error } = await supabase.from("activities").insert({
+    tenant_id: tenant.id,
+    entity_type: entityType,
+    entity_id: isUuid(entityId) ? entityId : null,
+    activity_type: activityType,
+    subject,
+    description: text(formData, "description") || null,
+    due_at: optionalDate(text(formData, "due_at")),
+    assigned_to: user.id,
+    created_by: user.id,
+  });
+  if (error) fail(path, "Não foi possível criar a atividade. Execute a migração 004 no Supabase.");
+  revalidateWorkspace();
+  done(path, "Atividade registrada.");
+}
+
+export async function toggleActivity(formData: FormData) {
+  const id = text(formData, "activity_id");
+  const path = returnPath(formData, "/app/agenda");
+  if (!isUuid(id)) fail(path, "Atividade inválida.");
+  const { supabase, tenant } = await requireActiveSubscription(path);
+  const completed = text(formData, "completed") === "true";
+  const { error } = await supabase.from("activities").update({ completed_at: completed ? null : new Date().toISOString() }).eq("id", id).eq("tenant_id", tenant.id);
+  if (error) fail(path, "Não foi possível atualizar a atividade.");
+  revalidateWorkspace();
+  done(path, completed ? "Atividade reaberta." : "Atividade concluída.");
+}
+
+export async function deleteActivity(formData: FormData) {
+  const id = text(formData, "activity_id");
+  const path = returnPath(formData, "/app/agenda");
+  if (!isUuid(id)) fail(path, "Atividade inválida.");
+  const { supabase, tenant } = await requireActiveSubscription(path);
+  const { error } = await supabase.from("activities").delete().eq("id", id).eq("tenant_id", tenant.id);
+  if (error) fail(path, "Não foi possível excluir a atividade.");
+  revalidateWorkspace();
+  done(path, "Atividade excluída.");
+}
+
+export async function saveApplicationReview(formData: FormData) {
+  const applicationId = text(formData, "application_id");
+  const jobId = text(formData, "job_id");
+  const path = `/app/vagas/${jobId}`;
+  const recommendation = text(formData, "recommendation");
+  const score = Number(text(formData, "score"));
+  if (!isUuid(applicationId) || !isUuid(jobId) || !Number.isInteger(score) || score < 1 || score > 5 || !isReviewRecommendation(recommendation)) fail(path, "Revise a nota e a recomendação.");
+  const { supabase, tenant, user, membership } = await requireActiveSubscription(path);
+  requireRecruitmentOperator(membership.role, path);
+  const { error } = await supabase.from("application_reviews").upsert({
+    tenant_id: tenant.id,
+    application_id: applicationId,
+    reviewer_id: user.id,
+    score,
+    recommendation,
+    strengths: text(formData, "strengths") || null,
+    risks: text(formData, "risks") || null,
+    notes: text(formData, "notes") || null,
+  }, { onConflict: "application_id,reviewer_id" });
+  if (error) fail(path, "Não foi possível salvar a avaliação. Execute a migração 004 no Supabase.");
+  revalidateWorkspace();
+  done(path, "Avaliação salva.");
 }
