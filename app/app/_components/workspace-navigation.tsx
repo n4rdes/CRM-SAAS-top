@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-type IconName = "home" | "calendar" | "clients" | "jobs" | "candidates" | "people" | "performance" | "reports" | "team" | "billing" | "settings";
+type IconName = "home" | "calendar" | "clients" | "jobs" | "candidates" | "people" | "performance" | "engagement" | "reports" | "team" | "billing" | "settings";
 
 const groups: Array<{ label: string; links: Array<{ href: string; label: string; icon: IconName }> }> = [
   {
@@ -21,6 +21,7 @@ const groups: Array<{ label: string; links: Array<{ href: string; label: string;
     links: [
       { href: "/app/pessoas", label: "Pessoas", icon: "people" },
       { href: "/app/desempenho", label: "Desempenho", icon: "performance" },
+      { href: "/app/clima", label: "Clima & engajamento", icon: "engagement" },
       { href: "/app/relatorios", label: "Relatórios", icon: "reports" },
     ],
   },
@@ -43,6 +44,7 @@ function NavIcon({ name }: { name: IconName }) {
     candidates: <><circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0M16 6h5M16 10h5M17 14h4M17 18h4" /></>,
     people: <><circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0M16 5a3 3 0 0 1 0 6M17 14a5 5 0 0 1 4 6" /></>,
     performance: <><path d="M4 19V9M10 19V5M16 19v-7M22 19H2" /><path d="m4 6 5-3 5 2 6-4" /></>,
+    engagement: <><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z" /><path d="M8 12h2l1.2-2.3L13 14l1.2-2H17" /></>,
     reports: <><path d="M5 3h14v18H5z" /><path d="M9 15v2M12 11v6M15 8v9M8 7h5" /></>,
     team: <><circle cx="9" cy="8" r="3" /><circle cx="18" cy="9" r="2" /><path d="M3 20a6 6 0 0 1 12 0M15 15a4 4 0 0 1 6 3.5" /></>,
     billing: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 10h18M7 15h3" /></>,

@@ -50,3 +50,15 @@ export function canManagePerformance(role: string) {
 export function canReviewPerformance(role: string) {
   return ["owner", "admin", "hr", "manager"].includes(role);
 }
+
+export function canViewEngagement(role: string) {
+  return ["owner", "admin", "hr", "manager"].includes(role);
+}
+
+export function canManageEngagement(role: string) {
+  return ["owner", "admin", "hr"].includes(role);
+}
+
+export function canManageEngagementActions(role: string) {
+  return ["owner", "admin", "hr", "manager"].includes(role);
+}

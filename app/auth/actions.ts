@@ -47,6 +47,7 @@ export async function signUp(formData: FormData) {
   const plan = ["basic", "pro", "custom"].includes(value(formData, "plan"))
     ? value(formData, "plan")
     : "basic";
+  const attribution = Object.fromEntries(["utm_source","utm_medium","utm_campaign","utm_content","utm_term","gclid"].map(key => [key,value(formData,key)]).filter(([,entry]) => entry));
 
   if (fullName.length < 3) authError("/auth/signup", "Informe seu nome completo.", next);
   if (!email || password.length < 8) {
@@ -59,7 +60,7 @@ export async function signUp(formData: FormData) {
     email,
     password,
     options: {
-      data: { full_name: fullName, selected_plan: plan },
+      data: { full_name: fullName, selected_plan: plan, acquisition: attribution },
       emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
     },
   });

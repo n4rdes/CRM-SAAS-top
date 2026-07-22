@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireWorkspace } from "@/lib/auth/workspace";
 
 type Limits = { active_jobs?: number | null };
+type Features = Record<string, boolean | undefined>;
 
 function deny(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
@@ -11,7 +12,7 @@ export async function requireActiveSubscription(path: string) {
   const workspace = await requireWorkspace();
   const { data, error } = await workspace.supabase
     .from("subscriptions")
-    .select("status, trial_ends_at, grace_ends_at, plan:plans(code, name, limits)")
+    .select("status, trial_ends_at, grace_ends_at, plan:plans(code, name, features, limits)")
     .eq("tenant_id", workspace.tenant.id)
     .single();
 
@@ -26,8 +27,16 @@ export async function requireActiveSubscription(path: string) {
     deny(path, "O prazo de regularização da assinatura terminou.");
   }
 
-  const plan = data.plan as unknown as { code: string; name: string; limits: Limits };
+  const plan = data.plan as unknown as { code: string; name: string; features: Features; limits: Limits };
   return { ...workspace, subscription: data, plan };
+}
+
+export async function requirePlanFeature(path: string, feature: string, label: string) {
+  const context = await requireActiveSubscription("/app/assinatura");
+  if (context.plan.features?.[feature] !== true) {
+    deny("/app/assinatura", `${label} não está incluído no plano ${context.plan.name}. Faça upgrade para continuar.`);
+  }
+  return context;
 }
 
 export async function assertActiveJobLimit(path = "/app/vagas") {

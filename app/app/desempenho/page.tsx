@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { SubmitButton } from "../_components/submit-button";
 import { createPerformanceCycle, createPerformanceGoal, updatePerformanceGoal } from "./actions";
-import { requireWorkspace } from "@/lib/auth/workspace";
+import { requirePlanFeature } from "@/lib/subscriptions/server";
 import { canManagePerformance, canViewPerformance } from "@/lib/domain/team";
 import { GOAL_CATEGORIES, GOAL_CATEGORY_LABELS, GOAL_STATUSES, GOAL_STATUS_LABELS, PERFORMANCE_CYCLE_STATUS_LABELS, ratingLabel } from "@/lib/domain/performance";
 
@@ -17,7 +17,7 @@ function formatDate(value: string) {
 
 export default async function PerformancePage({ searchParams }: { searchParams: Promise<{ error?: string; success?: string; cycle?: string; status?: string; q?: string }> }) {
   const query = await searchParams;
-  const { supabase, tenant, membership } = await requireWorkspace();
+  const { supabase, tenant, membership } = await requirePlanFeature("/app/desempenho", "performance", "Desempenho");
   if (!canViewPerformance(membership.role)) return <div className="workspace-content"><div className="page-heading"><div><h1>Desempenho</h1><p>Metas, avaliações e desenvolvimento.</p></div></div><div className="notice error-notice">Sua função não possui acesso a Desempenho.</div></div>;
   const canManage = canManagePerformance(membership.role);
 

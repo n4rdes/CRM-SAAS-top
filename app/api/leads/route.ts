@@ -14,16 +14,17 @@ export async function POST(request: Request) {
   const name = String(payload.name ?? "").trim();
   const email = String(payload.email ?? "").trim().toLowerCase();
   const company = String(payload.company ?? "").trim();
-  if (name.length < 3 || company.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (name.length < 3 || name.length > 180 || email.length > 254 || company.length < 2 || company.length > 180 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "Revise nome, e-mail e empresa" }, { status: 400 });
   }
+  const attribution = Object.fromEntries(["utm_source","utm_medium","utm_campaign","utm_content","utm_term","gclid"].map(key => [key,String(payload.attribution?.[key] ?? "").slice(0,200)]).filter(([,value]) => value));
   try {
     const { error } = await createAdminClient().from("marketing_leads").insert({
       name, email, company,
-      company_size: String(payload.company_size ?? "").trim() || null,
-      objective: String(payload.objective ?? "").trim() || null,
+      company_size: String(payload.company_size ?? "").trim().slice(0,80) || null,
+      objective: String(payload.objective ?? "").trim().slice(0,180) || null,
       source: "website",
-      attribution: payload.attribution ?? {},
+      attribution,
     });
     if (error) throw error;
     return NextResponse.json({ success: true }, { status: 201 });

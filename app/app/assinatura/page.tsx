@@ -7,7 +7,7 @@ import { canManageTeam } from "@/lib/domain/team";
 const STATUS_LABELS: Record<string, string> = { trialing: "Período de avaliação", active: "Ativa", past_due: "Pagamento pendente", grace: "Prazo de regularização", suspended: "Suspensa", canceled: "Cancelada" };
 const FEATURES: Record<string, string[]> = {
   basic: ["CRM de clientes", "ATS e banco de talentos", "Até 5 usuários", "Até 10 vagas ativas"],
-  pro: ["Tudo do Basic", "Até 20 usuários", "Vagas ativas ilimitadas", "Automações e IA (em evolução)"],
+  pro: ["Tudo do Basic", "Até 20 usuários", "Vagas ativas ilimitadas", "Desempenho, OKRs e 1:1", "Clima, eNPS e planos de ação"],
   custom: ["Tudo do Pro", "Usuários ilimitados", "SSO e marca própria", "Implantação acompanhada"],
 };
 

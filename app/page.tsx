@@ -1,6 +1,23 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, MouseEvent as ReactMouseEvent, useState } from "react";
+
+declare global { interface Window { dataLayer?: Array<Record<string, unknown>> } }
+
+function trackMarketingEvent(action: string, location: string) {
+  window.dataLayer?.push({ event: "prismae_conversion", action, location });
+}
+
+function startAttributedTrial(event: ReactMouseEvent<HTMLAnchorElement>, plan: string, location: string) {
+  trackMarketingEvent("start_trial",location);
+  const current = new URLSearchParams(window.location.search);
+  const attribution = new URLSearchParams();
+  ["utm_source","utm_medium","utm_campaign","utm_content","utm_term","gclid"].forEach(key => { const value = current.get(key); if (value) attribution.set(key,value); });
+  if (!attribution.size) return;
+  event.preventDefault();
+  sessionStorage.setItem("prismae_attribution",attribution.toString());
+  window.location.assign(`/auth/signup?plan=${plan}&${attribution.toString()}`);
+}
 
 type IconName =
   | "arrow"
@@ -46,15 +63,15 @@ const featureGroups = [
     icon: "crm" as IconName,
     tag: "Comercial",
     title: "CRM criado para consultorias de RH",
-    text: "Organize leads, empresas, contatos, propostas, contratos, SLAs e previsões de receita no mesmo lugar em que o recrutamento acontece.",
-    items: ["Funil comercial configurável", "Propostas e contratos", "Receita por cliente e recrutador"],
+    text: "Organize empresas, contatos, etapas comerciais e próximos passos no mesmo lugar em que o recrutamento acontece.",
+    items: ["Funil de empresas", "Contatos e histórico por cliente", "Agenda de follow-ups"],
   },
   {
     icon: "briefcase" as IconName,
     tag: "Recrutamento",
     title: "ATS que acompanha a vaga até a contratação",
-    text: "Abra requisições, publique vagas, centralize currículos e envolva recrutadores, gestores e clientes em uma seleção simples e rastreável.",
-    items: ["Banco único de talentos", "Pipeline por tipo de vaga", "Scorecards e portal do cliente"],
+    text: "Abra vagas, centralize candidatos e conduza cada candidatura em uma seleção simples, colaborativa e rastreável.",
+    items: ["Banco único de talentos", "Pipeline por vaga", "Avaliações e histórico de etapas"],
   },
   {
     icon: "people" as IconName,
@@ -66,23 +83,23 @@ const featureGroups = [
   {
     icon: "automation" as IconName,
     tag: "Operação",
-    title: "Automações que eliminam cobrança manual",
-    text: "Crie regras para aprovações, tarefas, mensagens, prazos e alertas. Cada processo ganha responsável, prazo e histórico de execução.",
-    items: ["Gatilhos sem código", "Aprovações em etapas", "Alertas de SLA e documentos"],
+    title: "Uma operação que não depende da memória",
+    text: "Centralize tarefas, ligações, reuniões, entrevistas e prazos. Cada próximo passo ganha contexto e histórico de execução.",
+    items: ["Agenda operacional", "Responsáveis e vencimentos", "Trilha de auditoria"],
   },
   {
     icon: "brain" as IconName,
-    tag: "Inteligência",
-    title: "Uma IA que entende os dados da empresa",
-    text: "Pergunte em linguagem natural, encontre gargalos e gere resumos com acesso limitado pelas permissões de cada usuário.",
-    items: ["Respostas com fonte dos dados", "Matching assistido de candidatos", "Insights comerciais e de retenção"],
+    tag: "Desempenho",
+    title: "Metas, avaliações e 1:1 com continuidade",
+    text: "Conecte resultados, conversas de desenvolvimento e avaliações periódicas ao histórico real de cada colaborador.",
+    items: ["OKRs e metas ponderadas", "Ciclos e calibração", "Check-ins 1:1"],
   },
   {
     icon: "chart" as IconName,
     tag: "Analytics",
     title: "Do lead à retenção, sem relatórios quebrados",
     text: "Cruze aquisição, recrutamento, receita e pessoas para entender o que realmente gera resultado para cada cliente e unidade.",
-    items: ["Dashboards por perfil", "Indicadores em tempo real", "Exportações e relatórios agendados"],
+    items: ["Dashboards por perfil", "Indicadores operacionais", "eNPS e planos de ação"],
   },
 ];
 
@@ -102,7 +119,7 @@ const plans = [
     monthly: 697,
     annual: 581,
     popular: true,
-    features: ["Até 20 usuários", "Até 500 colaboradores", "Vagas e candidatos ampliados", "Automações e aprovações", "Desempenho, PDI e clima", "IA e analytics avançado", "API e integrações"],
+    features: ["Até 20 usuários", "Até 500 colaboradores", "Vagas ativas ampliadas", "Agenda e trilha operacional", "Desempenho, OKRs e 1:1", "Clima, eNPS e reconhecimento", "People Analytics"],
   },
   {
     id: "custom",
@@ -140,7 +157,7 @@ function DashboardMock() {
       </div>
       <div className="dashboard-body">
         <aside className="mock-sidebar">
-          {['Visão geral', 'Agenda', 'Clientes', 'Vagas', 'Candidatos', 'Pessoas', 'Desempenho', 'Relatórios'].map((item, index) => (
+          {['Visão geral', 'Agenda', 'Clientes', 'Vagas', 'Candidatos', 'Pessoas', 'Desempenho', 'Clima & eNPS', 'Relatórios'].map((item, index) => (
             <span key={item} className={index === 0 ? "active" : ""}><i />{item}</span>
           ))}
         </aside>
@@ -214,9 +231,10 @@ function ContactModal({ onClose }: { onClose: () => void }) {
     try {
       const response = await fetch("/api/leads", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
         name: form.get("name"), email: form.get("email"), company: form.get("company"), company_size: form.get("company_size"), objective: form.get("objective"), website: form.get("website"),
-        attribution: { utm_source: query.get("utm_source") ?? "", utm_medium: query.get("utm_medium") ?? "", utm_campaign: query.get("utm_campaign") ?? "" },
+        attribution: Object.fromEntries(["utm_source","utm_medium","utm_campaign","utm_content","utm_term","gclid"].map(key => [key,query.get(key) ?? ""]).filter(([,value]) => value)),
       }) });
       if (!response.ok) throw new Error("LEAD_REQUEST_FAILED");
+      trackMarketingEvent("lead_submitted", "contact_modal");
       setSubmitted(true);
     } catch {
       setSubmitError("Não conseguimos registrar agora. Tente novamente em instantes.");
@@ -239,9 +257,9 @@ function ContactModal({ onClose }: { onClose: () => void }) {
           </div>
         ) : (
           <>
-            <p className="eyebrow">Conheça o Prismae</p>
-            <h2 id="contact-title">Conte um pouco sobre sua operação.</h2>
-            <p>Preencha os dados para receber uma demonstração direcionada ao seu cenário.</p>
+            <p className="eyebrow">Pare de operar no escuro</p>
+            <h2 id="contact-title">Descubra quanto sua operação perde com sistemas desconectados.</h2>
+            <p>Em uma conversa objetiva, mostramos o fluxo ideal para o seu cenário e o que pode ser centralizado primeiro.</p>
             <form onSubmit={submit}>
               <input className="form-honeypot" tabIndex={-1} autoComplete="off" name="website" aria-hidden="true" />
               <label>Nome completo<input required name="name" placeholder="Como podemos chamar você?" /></label>
@@ -250,9 +268,9 @@ function ContactModal({ onClose }: { onClose: () => void }) {
                 <label>Empresa<input required name="company" placeholder="Nome da empresa" /></label>
                 <label>Tamanho<select name="company_size" required defaultValue=""><option value="" disabled>Colaboradores</option><option>Até 50</option><option>51 a 200</option><option>201 a 500</option><option>Mais de 500</option></select></label>
               </div>
-              <label>Principal objetivo<select name="objective" required defaultValue=""><option value="" disabled>Selecione uma opção</option><option>Organizar CRM e clientes</option><option>Melhorar recrutamento e seleção</option><option>Centralizar RH e dados de pessoas</option><option>Substituir várias ferramentas</option></select></label>
+              <label>Principal objetivo<select name="objective" required defaultValue=""><option value="" disabled>Selecione uma opção</option><option>Organizar CRM e clientes</option><option>Melhorar recrutamento e seleção</option><option>Centralizar RH e dados de pessoas</option><option>Gerir desempenho, clima e eNPS</option><option>Substituir várias ferramentas</option></select></label>
               {submitError && <small className="form-submit-error">{submitError}</small>}
-              <button className="button primary wide" type="submit" disabled={submitting}>{submitting ? "Enviando..." : <>Solicitar demonstração <Icon name="arrow" /></>}</button>
+              <button className="button primary wide" type="submit" disabled={submitting}>{submitting ? "Enviando..." : <>Quero meu diagnóstico <Icon name="arrow" /></>}</button>
               <small>Ao enviar, você concorda em receber contato sobre o Prismae.</small>
             </form>
           </>
@@ -265,6 +283,10 @@ function ContactModal({ onClose }: { onClose: () => void }) {
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
+  const [teamHours, setTeamHours] = useState(80);
+  const [softwareSpend, setSoftwareSpend] = useState(2500);
+  const recoveredHours = Math.round(teamHours * 4.33 * .2);
+  const estimatedImpact = Math.round(recoveredHours * 45 + softwareSpend * .3);
 
   return (
     <main className="marketing-page">
@@ -280,31 +302,31 @@ export default function Home() {
         </nav>
         <div className="header-actions">
           <a href="/auth/login" className="login-link">Entrar</a>
-          <button className="button primary small" onClick={() => setContactOpen(true)}>Solicitar demonstração</button>
+          <button className="button primary small" onClick={() => { trackMarketingEvent("open_lead_form","header"); setContactOpen(true); }}>Calcular meu cenário</button>
         </div>
       </header>
 
       <section className="hero" id="inicio">
         <div className="orbit-art" aria-hidden="true"><i /><i /><i /><span /><span /><span /></div>
         <div className="hero-copy">
-          <p className="eyebrow"><span /> CRM + ATS + Gestão de Pessoas</p>
-          <h1>Da prospecção à retenção, <em>todo o ciclo de pessoas</em> em um só lugar.</h1>
-          <p className="hero-lead">Ganhe clientes, contrate talentos e desenvolva equipes com uma plataforma que conecta dados, processos e decisões — sem depender de cinco sistemas diferentes.</p>
+          <p className="eyebrow"><span /> PARE DE PAGAR PELO CAOS OPERACIONAL</p>
+          <h1>Seu RH perde dinheiro toda vez que uma informação <em>morre entre dois sistemas.</em></h1>
+          <p className="hero-lead">O Prismae conecta CRM, recrutamento, pessoas, desempenho e clima em uma única operação. Menos retrabalho. Mais controle. Nenhum dado recomeçando do zero.</p>
           <div className="hero-actions">
-            <a className="button primary" href="/demo">Explorar o produto <Icon name="arrow" /></a>
-            <button className="button secondary" onClick={() => document.querySelector('#produto')?.scrollIntoView({ behavior: 'smooth' })}><Icon name="play" /> Ver como funciona</button>
+            <a className="button primary" href="/auth/signup?plan=pro" onClick={event => startAttributedTrial(event,"pro","hero")}>Testar grátis por 14 dias <Icon name="arrow" /></a>
+            <a className="button secondary" href="/demo" onClick={() => trackMarketingEvent("view_demo","hero")}><Icon name="play" /> Ver o produto por dentro</a>
           </div>
           <div className="hero-proof">
-            <span><Icon name="check" size={16} /> Implantação guiada</span>
+            <span><Icon name="check" size={16} /> Sem cartão para criar a conta</span>
             <span><Icon name="check" size={16} /> Dados isolados por empresa</span>
-            <span><Icon name="check" size={16} /> Pronto para LGPD</span>
+            <span><Icon name="check" size={16} /> Cancele quando quiser</span>
           </div>
         </div>
         <div className="hero-product"><DashboardMock /></div>
       </section>
 
       <section className="proof-strip" aria-label="Principais benefícios">
-        <p>Uma única base de dados para toda a operação</p>
+        <p>O custo de continuar fragmentado cresce todos os meses</p>
         <div><strong>1</strong><span>cadastro do candidato<br />até virar colaborador</span></div>
         <div><strong>360°</strong><span>visão de clientes,<br />vagas e pessoas</span></div>
         <div><strong>3</strong><span>portais conectados:<br />empresa, cliente e talento</span></div>
@@ -314,8 +336,8 @@ export default function Home() {
       <section className="problem-section section" id="produto">
         <div className="section-heading centered">
           <p className="eyebrow">O problema que ninguém resolveu por inteiro</p>
-          <h2>Seu RH não deveria perder informação a cada etapa.</h2>
-          <p>Os sistemas tradicionais cuidam apenas de uma parte: o CRM para no contrato, o ATS para na contratação e o software de RH começa tudo de novo.</p>
+          <h2>Planilhas não são flexibilidade. São uma dívida operacional escondida.</h2>
+          <p>O CRM para no contrato, o ATS para na contratação e o software de RH começa tudo de novo. Sua equipe paga a conta copiando dados, cobrando prazos e montando relatórios que já nascem atrasados.</p>
         </div>
         <div className="fragmented-flow">
           {[
@@ -330,6 +352,11 @@ export default function Home() {
           ))}
         </div>
         <div className="unified-answer"><Brand compact /><span>Uma identidade. Uma linha do tempo. Uma fonte confiável.</span><Icon name="sparkles" size={24} /></div>
+      </section>
+
+      <section className="before-after-section section">
+        <div className="section-heading split-heading"><div><p className="eyebrow">A decisão que muda a operação</p><h2>Continue administrando ferramentas. Ou comece a administrar resultados.</h2></div><p>O Prismae elimina as passagens manuais entre comercial, recrutamento e RH. Cada contratação preserva contexto, responsabilidade e histórico.</p></div>
+        <div className="before-after-grid"><article className="before-card"><span>HOJE, FRAGMENTADO</span><h3>O processo trabalha contra o time.</h3><ul><li>O mesmo dado digitado mais de uma vez</li><li>Prazo cobrado por mensagem e memória</li><li>Relatório montado depois que a decisão passou</li><li>Candidato contratado desaparece do histórico</li><li>Feedback coletado sem plano de ação</li></ul></article><article className="after-card"><span>COM PRISMAE</span><h3>O sistema carrega o contexto.</h3><ul><li>Uma identidade da candidatura ao colaborador</li><li>Agenda, responsáveis e prazos visíveis</li><li>Indicadores calculados na mesma base</li><li>Metas, avaliações, eNPS e ações conectados</li><li>Permissões e auditoria por empresa</li></ul><a href="/auth/signup?plan=pro" onClick={event => startAttributedTrial(event,"pro","before_after")}>Começar a transformação <Icon name="arrow" size={17} /></a></article></div>
       </section>
 
       <section className="solutions-section section" id="solucoes">
@@ -350,6 +377,10 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="roi-section section" id="roi">
+        <div className="roi-card"><div className="roi-copy"><p className="eyebrow">Calculadora de desperdício operacional</p><h2>Quanto custa manter seu time copiando, conferindo e perseguindo informação?</h2><p>Monte um cenário rápido. A estimativa usa 20% das horas operacionais potencialmente recuperáveis e 30% de consolidação do gasto com ferramentas. É uma simulação, não uma promessa de resultado.</p><div className="roi-controls"><label><span>Horas semanais gastas em tarefas manuais <b>{teamHours}h</b></span><input type="range" min="10" max="400" step="10" value={teamHours} onChange={event => setTeamHours(Number(event.target.value))} /></label><label><span>Gasto mensal com softwares separados <b>R$ {softwareSpend.toLocaleString("pt-BR")}</b></span><input type="range" min="0" max="20000" step="250" value={softwareSpend} onChange={event => setSoftwareSpend(Number(event.target.value))} /></label></div></div><div className="roi-result"><small>IMPACTO MENSAL ESTIMADO</small><strong>R$ {estimatedImpact.toLocaleString("pt-BR")}</strong><span>em capacidade e consolidação</span><div><b>{recoveredHours}h</b><small>potencialmente recuperadas por mês</small></div><button className="button primary wide" onClick={() => { trackMarketingEvent("open_lead_form","roi_calculator"); setContactOpen(true); }}>Validar este cenário <Icon name="arrow" /></button><em>Estimativa ilustrativa baseada nos valores informados.</em></div></div>
+      </section>
+
       <section className="journey-section section">
         <div className="section-heading centered inverse">
           <p className="eyebrow">Uma jornada contínua</p>
@@ -367,28 +398,28 @@ export default function Home() {
         </div>
         <div className="journey-dashboard">
           <div className="journey-chart"><span>Receita recorrente por cliente</span><strong>R$ 184,2 mil</strong><em>↗ 18,4% no trimestre</em><svg viewBox="0 0 560 130" preserveAspectRatio="none"><defs><linearGradient id="area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#7486ff" stopOpacity=".38"/><stop offset="1" stopColor="#7486ff" stopOpacity="0"/></linearGradient></defs><path className="area" d="M0 118 C60 92,80 108,130 70 S220 94,270 55 S360 78,410 32 S500 50,560 12 L560 130 L0 130Z"/><path d="M0 118 C60 92,80 108,130 70 S220 94,270 55 S360 78,410 32 S500 50,560 12"/></svg></div>
-          <div className="journey-insight"><span><Icon name="sparkles" /></span><small>Insight Prismae</small><strong>Clientes com onboarding concluído em até 7 dias têm maior retenção no primeiro ano.</strong><a href="/demo">Abrir análise <Icon name="arrow" size={16} /></a></div>
+          <div className="journey-insight"><span><Icon name="sparkles" /></span><small>Leitura conectada</small><strong>Compare a origem da contratação, o onboarding, o desempenho e o clima sem remontar a história em planilhas.</strong><a href="/demo">Abrir demonstração <Icon name="arrow" size={16} /></a></div>
         </div>
       </section>
 
       <section className="ai-section section" id="diferenciais">
         <div className="ai-copy">
-          <p className="eyebrow">Prismae Intelligence</p>
-          <h2>Não é uma IA solta. É inteligência com contexto, permissão e rastreabilidade.</h2>
-          <p>Pergunte sobre a operação em linguagem natural. A resposta respeita o acesso do usuário, mostra de onde vieram os dados e nunca mistura informações de empresas diferentes.</p>
+          <p className="eyebrow">Prismae Analytics</p>
+          <h2>O dado só tem valor quando alguém consegue agir antes que seja tarde.</h2>
+          <p>Os indicadores nascem dos processos reais, respeitam o acesso de cada função e nunca misturam informações entre empresas.</p>
           <ul>
-            <li><Icon name="check" />Resuma uma vaga e indique gargalos do funil.</li>
-            <li><Icon name="check" />Encontre candidatos aderentes sem excluir por critérios sensíveis.</li>
-            <li><Icon name="check" />Compare receita, SLA e qualidade por cliente.</li>
-            <li><Icon name="check" />Antecipe riscos de vencimentos, turnover e sobrecarga.</li>
+            <li><Icon name="check" />Enxergue gargalos do funil de recrutamento.</li>
+            <li><Icon name="check" />Acompanhe prazos e atividades atrasadas.</li>
+            <li><Icon name="check" />Cruze metas, avaliações, eNPS e planos de ação.</li>
+            <li><Icon name="check" />Mantenha cada alteração crítica em auditoria.</li>
           </ul>
-          <a className="text-link" href="/demo">Experimentar no painel <Icon name="arrow" /></a>
+          <a className="text-link" href="/demo">Ver os relatórios no painel <Icon name="arrow" /></a>
         </div>
         <div className="ai-panel">
-          <div className="ai-panel-top"><span><Icon name="sparkles" size={18} /></span><b>Assistente Prismae</b><small>Dados atualizados agora</small></div>
-          <div className="ai-question"><small>Você</small><p>Quais clientes estão com vagas atrasadas e o que está travando cada processo?</p></div>
-          <div className="ai-answer"><span><Icon name="sparkles" size={16} /></span><div><small>Prismae</small><p>Encontrei <b>3 clientes com 7 vagas fora do SLA</b>. O principal gargalo está entre triagem e entrevista:</p><ul><li><b>Acme Logística</b> — 3 vagas, aguardando retorno do gestor há 4 dias.</li><li><b>Vértice Tech</b> — 2 vagas, poucos candidatos aprovados na triagem técnica.</li><li><b>Nova Contábil</b> — 2 vagas, entrevistas remarcadas.</li></ul><div className="source-chips"><span>7 vagas</span><span>3 clientes</span><span>Pipeline ATS</span><span>Últimos 30 dias</span></div></div></div>
-          <div className="ai-input">Pergunte sobre clientes, vagas ou pessoas… <button aria-label="Enviar"><Icon name="arrow" size={16} /></button></div>
+          <div className="ai-panel-top"><span><Icon name="chart" size={18} /></span><b>Resumo executivo</b><small>Cenário ilustrativo</small></div>
+          <div className="ai-question"><small>FILTRO ATUAL</small><p>Quais processos exigem atenção da liderança nesta semana?</p></div>
+          <div className="ai-answer"><span><Icon name="chart" size={16} /></span><div><small>Leitura operacional</small><p>O painel concentra os sinais que pedem decisão:</p><ul><li><b>Recrutamento</b> — vagas e candidaturas paradas por etapa.</li><li><b>Pessoas</b> — jornadas, documentos e atividades pendentes.</li><li><b>Desempenho</b> — metas em risco e avaliações abertas.</li><li><b>Clima</b> — participação, eNPS e planos atrasados.</li></ul><div className="source-chips"><span>CRM</span><span>ATS</span><span>Pessoas</span><span>Clima</span></div></div></div>
+          <div className="ai-input">Dados do ambiente, respeitando seu perfil de acesso <button aria-label="Abrir"><Icon name="arrow" size={16} /></button></div>
         </div>
       </section>
 
@@ -410,7 +441,7 @@ export default function Home() {
         <div className="section-heading centered">
           <p className="eyebrow">Planos que acompanham o crescimento</p>
           <h2>Comece com o essencial. Evolua sem trocar de sistema.</h2>
-          <p>Os valores abaixo são a proposta comercial inicial para validação do produto.</p>
+          <p>Escolha um plano, teste com seus próprios processos por 14 dias e decida com evidência — não com promessa comercial.</p>
         </div>
         <div className="pricing-grid">
           {plans.map((plan) => (
@@ -421,13 +452,13 @@ export default function Home() {
               {plan.custom ? (
                 <button className="button wide secondary" onClick={() => setContactOpen(true)}>Falar com especialista <Icon name="arrow" /></button>
               ) : (
-                <a className={`button wide ${plan.popular ? "primary" : "secondary"}`} href={`/auth/signup?plan=${plan.id}`}>Começar no {plan.name} <Icon name="arrow" /></a>
+                <a className={`button wide ${plan.popular ? "primary" : "secondary"}`} href={`/auth/signup?plan=${plan.id}`} onClick={event => startAttributedTrial(event,plan.id,`pricing_${plan.id}`)}>Testar {plan.name} por 14 dias <Icon name="arrow" /></a>
               )}
               <ul>{plan.features.map((feature) => <li key={feature}><span><Icon name="check" size={15} /></span>{feature}</li>)}</ul>
             </article>
           ))}
         </div>
-        <p className="pricing-note">Todos os planos incluem ambiente multiempresa seguro, suporte em português, atualizações e backup. Integrações de terceiros podem ter cobrança própria.</p>
+        <p className="pricing-note">Criação de conta sem cartão. Todos os planos incluem ambiente multiempresa seguro, suporte em português, atualizações e backup. Integrações de terceiros podem ter cobrança própria.</p>
       </section>
 
       <section className="faq-section section">
@@ -444,7 +475,7 @@ export default function Home() {
       </section>
 
       <section className="final-cta">
-        <div><p className="eyebrow">A operação inteira, finalmente conectada</p><h2>Seu próximo sistema de RH pode ser o último que você precisa trocar.</h2><p>Explore o painel completo e veja como CRM, recrutamento e gestão de pessoas funcionam juntos.</p><div><a className="button light" href="/demo">Explorar demonstração <Icon name="arrow" /></a><button className="button ghost-light" onClick={() => setContactOpen(true)}>Falar com especialista</button></div></div>
+        <div><p className="eyebrow">A troca custa menos do que continuar igual</p><h2>Cada mês sem uma fonte única é mais dado duplicado, mais prazo perdido e menos margem.</h2><p>Crie seu ambiente agora e coloque o Prismae para trabalhar com um processo real da sua empresa.</p><div><a className="button light" href="/auth/signup?plan=pro" onClick={event => startAttributedTrial(event,"pro","final_cta")}>Começar 14 dias grátis <Icon name="arrow" /></a><button className="button ghost-light" onClick={() => { trackMarketingEvent("open_lead_form","final_cta"); setContactOpen(true); }}>Quero um diagnóstico</button></div></div>
         <div className="cta-orbit" aria-hidden="true"><i /><i /><i /><span /></div>
       </section>
 
@@ -455,6 +486,8 @@ export default function Home() {
         <div><b>Empresa</b><button onClick={() => setContactOpen(true)}>Contato</button><a href="#inicio">Privacidade</a><a href="#inicio">Termos</a></div>
         <small>© 2026 Prismae People OS. Todos os direitos reservados.</small>
       </footer>
+
+      <div className="floating-conversion"><div><strong>Seu processo não precisa esperar a próxima planilha quebrar.</strong><span>Crie uma conta e teste com dados reais por 14 dias.</span></div><a href="/auth/signup?plan=pro" onClick={event => startAttributedTrial(event,"pro","floating_cta")}>Começar grátis <Icon name="arrow" size={17} /></a></div>
 
       {contactOpen && <ContactModal onClose={() => setContactOpen(false)} />}
     </main>
