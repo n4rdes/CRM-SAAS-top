@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { evaluateAccess, PLAN_CATALOG, type SubscriptionSnapshot } from "../lib/subscriptions";
+import { getPlanCodeFromPriceIds } from "../lib/billing/config";
 
 const activeBasic: SubscriptionSnapshot = { tenantId: "tenant", plan: "BASIC", status: "ACTIVE" };
 
@@ -25,5 +26,20 @@ describe("subscription entitlements", () => {
   it("aplica limites do plano sem limitar o Custom", () => {
     expect(evaluateAccess(activeBasic, "ats", { limit: "active_jobs", current: 10 })).toMatchObject({ allowed: false, reason: "LIMIT_REACHED", limit: 10 });
     expect(evaluateAccess({ ...activeBasic, plan: "CUSTOM" }, "ats", { limit: "active_jobs", current: 10000 }).allowed).toBe(true);
+  });
+});
+
+describe("Stripe plan mapping", () => {
+  it("prioriza o preço atual da assinatura sobre o metadata antigo", () => {
+    process.env.STRIPE_BASIC_PRICE_ID = "price_basic";
+    process.env.STRIPE_PRO_PRICE_ID = "price_pro";
+    expect(getPlanCodeFromPriceIds(["price_pro"], "basic")).toBe("pro");
+  });
+
+  it("aceita qualquer item conhecido e rejeita metadata inválido", () => {
+    process.env.STRIPE_BASIC_PRICE_ID = "price_basic";
+    process.env.STRIPE_PRO_PRICE_ID = "price_pro";
+    expect(getPlanCodeFromPriceIds(["price_extra", "price_basic"], "pro")).toBe("basic");
+    expect(getPlanCodeFromPriceIds(["price_unknown"], "enterprise")).toBeNull();
   });
 });

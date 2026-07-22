@@ -21,6 +21,14 @@ export function getPlanCodeFromPriceId(priceId: string | null | undefined): Bill
   return null;
 }
 
+export function getPlanCodeFromPriceIds(priceIds: Array<string | null | undefined>, metadataPlanCode?: string | null): BillingPlanCode | null {
+  for (const priceId of priceIds) {
+    const planCode = getPlanCodeFromPriceId(priceId);
+    if (planCode) return planCode;
+  }
+  return metadataPlanCode && isBillingPlanCode(metadataPlanCode) ? metadataPlanCode : null;
+}
+
 export function isStripeConfigured() {
   return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_BASIC_PRICE_ID && process.env.STRIPE_PRO_PRICE_ID);
 }

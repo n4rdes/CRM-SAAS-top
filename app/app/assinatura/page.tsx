@@ -1,7 +1,8 @@
-import { openBillingPortal, startCheckout } from "./actions";
+import { openBillingPortal, startCheckout, syncBillingSubscription } from "./actions";
 import { SubmitButton } from "../_components/submit-button";
 import { requireWorkspace } from "@/lib/auth/workspace";
 import { isStripeConfigured } from "@/lib/billing/config";
+import { reconcileTenantSubscription } from "@/lib/billing/subscription-sync";
 import { canManageTeam } from "@/lib/domain/team";
 
 const STATUS_LABELS: Record<string, string> = { trialing: "Período de avaliação", active: "Ativa", past_due: "Pagamento pendente", grace: "Prazo de regularização", suspended: "Suspensa", canceled: "Cancelada" };
@@ -22,9 +23,20 @@ function currency(cents: number | null) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(cents / 100);
 }
 
-export default async function SubscriptionPage({ searchParams }: { searchParams: Promise<{ error?: string; checkout?: string }> }) {
+export default async function SubscriptionPage({ searchParams }: { searchParams: Promise<{ error?: string; checkout?: string; portal?: string; sync?: string; plan?: string }> }) {
   const params = await searchParams;
   const { supabase, tenant, membership } = await requireWorkspace();
+  const manager = canManageTeam(membership.role);
+  const configured = isStripeConfigured();
+  let reconciliationFailed = false;
+  if (manager && configured && process.env.SUPABASE_SECRET_KEY) {
+    try {
+      await reconcileTenantSubscription(tenant.id);
+    } catch (error) {
+      reconciliationFailed = true;
+      console.error("[stripe-sync] Não foi possível reconciliar a tela de assinatura", error);
+    }
+  }
   const [subscriptionResult, plansResult, membersResult, jobsResult] = await Promise.all([
     supabase.from("subscriptions").select("status,trial_ends_at,current_period_ends_at,cancel_at_period_end,provider_customer_id,plan:plans(code,name,price_monthly_cents,limits)").eq("tenant_id", tenant.id).single(),
     supabase.from("plans").select("code,name,price_monthly_cents,limits").eq("active", true).order("price_monthly_cents", { ascending: true, nullsFirst: false }),
@@ -33,17 +45,18 @@ export default async function SubscriptionPage({ searchParams }: { searchParams:
   ]);
   const subscription = subscriptionResult.data;
   const currentPlan = subscription?.plan as unknown as { code: string; name: string; price_monthly_cents: number | null; limits: { users?: number | null; active_jobs?: number | null } } | null;
-  const manager = canManageTeam(membership.role);
-  const configured = isStripeConfigured();
   const endDate = subscription?.current_period_ends_at ?? subscription?.trial_ends_at;
 
   return <div className="workspace-content">
     <div className="page-heading"><div><h1>Assinatura</h1><p>Plano, limites de uso e cobrança da empresa.</p></div><span className={`subscription-status subscription-${subscription?.status ?? "unknown"}`}>{STATUS_LABELS[subscription?.status ?? ""] ?? subscription?.status}</span></div>
     {params.error && <div className="notice error-notice">{params.error}</div>}
     {params.checkout === "success" && <div className="notice">Pagamento concluído. A confirmação da assinatura pode levar alguns segundos.</div>}
+    {params.sync === "success" && <div className="notice">Assinatura sincronizada com a Stripe. O plano {params.plan?.toUpperCase()} já está ativo no sistema.</div>}
+    {params.portal === "return" && !reconciliationFailed && <div className="notice">Alterações da Stripe conferidas e sincronizadas.</div>}
+    {reconciliationFailed && <div className="notice error-notice">Não conseguimos conferir a Stripe agora. Você pode tentar novamente pelo botão “Sincronizar Stripe”.</div>}
     {params.checkout === "canceled" && <div className="notice error-notice">Checkout cancelado. Nenhuma cobrança foi realizada.</div>}
     {!configured && manager && <div className="setup-notice"><strong>Modo de preparação</strong><span>Os planos já estão funcionais, mas o Stripe ainda precisa das chaves para receber pagamentos.</span></div>}
-    <section className="current-subscription panel"><div><small>PLANO ATUAL</small><h2>{currentPlan?.name ?? "Basic"}</h2><p>{STATUS_LABELS[subscription?.status ?? ""] ?? "Status indisponível"}{endDate ? ` · próximo marco em ${new Date(endDate).toLocaleDateString("pt-BR")}` : ""}</p></div><div className="usage-summary"><div><span>Usuários</span><strong>{membersResult.count ?? 0}{typeof currentPlan?.limits?.users === "number" ? `/${currentPlan.limits.users}` : ""}</strong></div><div><span>Vagas ativas</span><strong>{jobsResult.count ?? 0}{typeof currentPlan?.limits?.active_jobs === "number" ? `/${currentPlan.limits.active_jobs}` : ""}</strong></div></div>{manager && subscription?.provider_customer_id && <form action={openBillingPortal}><SubmitButton pendingLabel="Abrindo...">Gerenciar cobrança</SubmitButton></form>}</section>
+    <section className="current-subscription panel"><div><small>PLANO ATUAL</small><h2>{currentPlan?.name ?? "Basic"}</h2><p>{STATUS_LABELS[subscription?.status ?? ""] ?? "Status indisponível"}{endDate ? ` · próximo marco em ${new Date(endDate).toLocaleDateString("pt-BR")}` : ""}</p></div><div className="usage-summary"><div><span>Usuários</span><strong>{membersResult.count ?? 0}{typeof currentPlan?.limits?.users === "number" ? `/${currentPlan.limits.users}` : ""}</strong></div><div><span>Vagas ativas</span><strong>{jobsResult.count ?? 0}{typeof currentPlan?.limits?.active_jobs === "number" ? `/${currentPlan.limits.active_jobs}` : ""}</strong></div></div>{manager && subscription?.provider_customer_id && <div className="billing-management-actions"><form action={syncBillingSubscription}><SubmitButton className="secondary-button" pendingLabel="Sincronizando...">Sincronizar Stripe</SubmitButton></form><form action={openBillingPortal}><SubmitButton pendingLabel="Abrindo...">Gerenciar cobrança</SubmitButton></form></div>}</section>
     <div className="billing-plans">{(plansResult.data ?? []).map((plan, index) => { const limits = plan.limits as { users?: number | null; active_jobs?: number | null }; const current = plan.code === currentPlan?.code; const copy = PLAN_COPY[plan.code] ?? { eyebrow: "PLANO", description: "Recursos para sua operação." }; return <article className={`billing-plan billing-plan-${plan.code} ${plan.code === "pro" ? "featured-plan" : ""}`} key={plan.code}>
       <header className="billing-plan-header"><div><small>{current ? "SEU PLANO" : copy.eyebrow}</small><span className="plan-number">0{index + 1}</span></div><h2>{plan.name}</h2><p>{copy.description}</p><div className="billing-price"><strong>{currency(plan.price_monthly_cents)}</strong>{plan.price_monthly_cents !== null && <span>/mês</span>}</div></header>
       <ul>{(FEATURES[plan.code] ?? [`${limits.users ?? "Ilimitados"} usuários`]).map(feature => <li key={feature}><span>✓</span>{feature}</li>)}</ul>

@@ -3,6 +3,7 @@ import { signOut } from "@/app/auth/actions";
 import { requireWorkspace } from "@/lib/auth/workspace";
 import { TEAM_ROLE_LABELS } from "@/lib/domain/team";
 import { WorkspaceNavigation } from "./_components/workspace-navigation";
+import { SidebarCollapseButton } from "./_components/sidebar-collapse-button";
 import "./app.css";
 
 export default async function WorkspaceLayout({ children }: { children: React.ReactNode }) {
@@ -18,6 +19,7 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
 
   return <div className="workspace">
     <aside className="workspace-sidebar">
+      <SidebarCollapseButton />
       <Link href="/app" className="workspace-brand"><span className="workspace-brand-mark"><i /></span><span><strong>Prismae</strong><small>People OS</small></span></Link>
       <div className="workspace-company"><span className="workspace-company-icon">{tenant.name.slice(0, 1).toUpperCase()}</span><div><small>Ambiente atual</small><strong>{tenant.name}</strong><span>{TEAM_ROLE_LABELS[membership.role] ?? membership.role}</span></div></div>
       <WorkspaceNavigation />

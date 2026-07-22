@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireWorkspace } from "@/lib/auth/workspace";
 import { getAppUrl, getStripePriceId, isBillingPlanCode } from "@/lib/billing/config";
 import { getStripe } from "@/lib/billing/stripe";
+import { reconcileTenantSubscription } from "@/lib/billing/subscription-sync";
 import { canManageTeam } from "@/lib/domain/team";
 
 function fail(message: string): never {
@@ -50,10 +51,23 @@ export async function openBillingPortal() {
   const { data } = await supabase.from("subscriptions").select("provider_customer_id").eq("tenant_id", tenant.id).single();
   if (!data?.provider_customer_id || !process.env.STRIPE_SECRET_KEY) fail("Ainda não existe uma cobrança ativa para esta empresa.");
   try {
-    const session = await getStripe().billingPortal.sessions.create({ customer: data.provider_customer_id, return_url: `${getAppUrl()}/app/assinatura` });
+    const session = await getStripe().billingPortal.sessions.create({ customer: data.provider_customer_id, return_url: `${getAppUrl()}/app/assinatura?portal=return` });
     redirect(session.url);
   } catch (error) {
     if (error && typeof error === "object" && "digest" in error) throw error;
     fail("Não foi possível abrir o portal de cobrança.");
+  }
+}
+
+export async function syncBillingSubscription() {
+  const { tenant } = await requireBillingManager();
+  try {
+    const result = await reconcileTenantSubscription(tenant.id);
+    if (!result) fail("Nenhuma assinatura da Stripe foi encontrada para sincronizar.");
+    redirect(`/app/assinatura?sync=success&plan=${result.planCode}`);
+  } catch (error) {
+    if (error && typeof error === "object" && "digest" in error) throw error;
+    console.error("[stripe-sync] Falha na sincronização manual", error);
+    fail("Não foi possível sincronizar a assinatura com a Stripe agora.");
   }
 }

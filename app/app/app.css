@@ -173,6 +173,9 @@
 .workspace-signout:hover { color: #a44336; border-color: #efcfc8; background: #fff7f5; }
 .workspace-signout svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .workspace-signout span { display: none; }
+.workspace-sidebar-toggle { width: 29px; height: 29px; padding: 0; position: absolute; top: 26px; right: -15px; z-index: 3; display: grid; place-items: center; border: 1px solid #dfe3ee; border-radius: 9px; color: #677083; background: #fff; box-shadow: 0 6px 18px rgba(30,39,72,.11); cursor: pointer; transition: color .16s, border-color .16s, background .16s, transform .24s ease; }
+.workspace-sidebar-toggle:hover { color: var(--app-primary); border-color: #c7d0f3; background: #f7f9ff; }
+.workspace-sidebar-toggle svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .dashboard-metric-grid { grid-template-columns: repeat(4,1fr); }.dashboard-quick-links { grid-template-columns: repeat(3,1fr); }
 .workspace-topbar { min-height: 76px; padding: 0 34px; position: sticky; top: 0; z-index: 15; justify-content: space-between; border-bottom: 1px solid rgba(226,228,234,.92); background: rgba(255,255,255,.88); box-shadow: 0 5px 20px rgba(35,43,72,.025); backdrop-filter: blur(14px); }
 .topbar-context { display: grid; gap: 2px; }
@@ -264,6 +267,38 @@
 .performance-side-column > .panel { position: relative; z-index: 0; }
 .billing-alert { border-bottom: 1px solid #f0d69b; font-size: 10px; }
 
+/* Menu lateral retrátil: preserva todos os atalhos como uma barra de ícones. */
+.workspace,.workspace-sidebar,.workspace-brand,.workspace-company,.workspace-nav a,.workspace-nav button,.workspace-sidebar-footer { transition: grid-template-columns .24s ease, width .24s ease, padding .24s ease, margin .24s ease, gap .2s ease; }
+.workspace.sidebar-collapsed { grid-template-columns: 78px minmax(0,1fr); }
+.workspace.sidebar-collapsed .workspace-sidebar { width: 78px; padding-inline: 10px; }
+.workspace.sidebar-collapsed .workspace-sidebar-toggle { transform: rotate(180deg); }
+.workspace.sidebar-collapsed .workspace-brand { margin-inline: 13px; justify-content: center; }
+.workspace.sidebar-collapsed .workspace-brand > span:last-child,
+.workspace.sidebar-collapsed .workspace-company > div,
+.workspace.sidebar-collapsed .workspace-nav-group > small,
+.workspace.sidebar-collapsed .workspace-nav-label,
+.workspace.sidebar-collapsed .workspace-sidebar-user > div { display: none; }
+.workspace.sidebar-collapsed .workspace-company { margin-inline: 5px; padding: 8px 6px; justify-content: center; }
+.workspace.sidebar-collapsed .workspace-company-icon { width: 38px; height: 38px; }
+.workspace.sidebar-collapsed .workspace-nav { gap: 9px; }
+.workspace.sidebar-collapsed .workspace-nav-group { gap: 5px; }
+.workspace.sidebar-collapsed .workspace-nav a,
+.workspace.sidebar-collapsed .workspace-nav button { width: 48px; min-height: 44px; margin-inline: auto; padding: 0; justify-content: center; }
+.workspace.sidebar-collapsed .workspace-nav a:hover,
+.workspace.sidebar-collapsed .workspace-nav button:hover { transform: translateY(-1px); }
+.workspace.sidebar-collapsed .workspace-nav a.active > i,
+.workspace.sidebar-collapsed .workspace-nav button.active > i { right: -10px; }
+.workspace.sidebar-collapsed .workspace-sidebar-footer { grid-template-columns: 1fr; justify-items: center; gap: 8px; }
+.workspace.sidebar-collapsed .workspace-sidebar-user { justify-content: center; }
+.workspace-nav button { width: 100%; min-height: 42px; padding: 0 11px; position: relative; display: flex; align-items: center; gap: 11px; border: 1px solid transparent; border-radius: 9px; color: #616977; background: transparent; font-size: 12px; font-weight: 650; text-align: left; cursor: pointer; transition: color .16s ease, background .16s ease, border-color .16s ease, transform .16s ease; }
+.workspace-nav button:hover { color: var(--app-primary-dark); border-color: #e4e8f7; background: #f7f8fd; transform: translateX(2px); }
+.workspace-nav button.active { color: var(--app-primary); border-color: #dfe5ff; background: var(--app-primary-soft); font-weight: 800; }
+.workspace-nav button.active > i { width: 3px; height: 20px; position: absolute; top: 50%; right: -12px; border-radius: 3px 0 0 3px; background: var(--app-primary); transform: translateY(-50%); }
+.workspace-nav button.active .workspace-nav-icon { color: var(--app-primary); }
+.billing-management-actions { display: flex; align-items: center; gap: 8px; }
+.current-subscription .billing-management-actions form button { min-height: 40px; padding: 0 15px; border: 0; border-radius: 7px; color: white; background: var(--app-primary); font-size: 9px; font-weight: 850; white-space: nowrap; cursor: pointer; }
+.current-subscription .billing-management-actions .secondary-button { color: var(--app-primary); border: 1px solid #ccd4f2; background: #f7f9ff; box-shadow: none; }
+
 @media(max-width:1100px){
   .workspace { grid-template-columns: 238px minmax(0,1fr); }
   .workspace-sidebar { width: 238px; }
@@ -281,6 +316,13 @@
   .workspace-nav a { min-height: 38px; padding-inline: 10px; white-space: nowrap; }
   .workspace-nav a.active > i { width: 18px; height: 3px; top: auto; right: 50%; bottom: -6px; border-radius: 3px 3px 0 0; transform: translateX(50%); }
   .workspace-sidebar-footer { position: absolute; top: 14px; right: 18px; margin: 0; padding: 0; border: 0; }
+  .workspace-sidebar-toggle { display: none; }
+  .workspace.sidebar-collapsed .workspace-sidebar { width: 100%; padding: 17px 20px 14px; }
+  .workspace.sidebar-collapsed .workspace-brand { margin: 0 0 14px; justify-content: flex-start; }
+  .workspace.sidebar-collapsed .workspace-brand > span:last-child,.workspace.sidebar-collapsed .workspace-nav-label { display: initial; }
+  .workspace.sidebar-collapsed .workspace-nav { display: flex; gap: 16px; }
+  .workspace.sidebar-collapsed .workspace-nav-group { display: flex; gap: 4px; }
+  .workspace.sidebar-collapsed .workspace-nav a,.workspace.sidebar-collapsed .workspace-nav button { width: auto; min-height: 38px; margin: 0; padding-inline: 10px; }
   .workspace-sidebar-user { display: none; }
   .workspace-topbar { position: relative; min-height: 62px; display: flex; padding-inline: 20px; }
   .workspace-content,.wide-content { width: min(100% - 32px,1240px); padding-top: 30px; }

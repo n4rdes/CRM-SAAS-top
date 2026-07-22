@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-type IconName = "home" | "inbox" | "calendar" | "clients" | "jobs" | "candidates" | "people" | "leave" | "performance" | "engagement" | "automations" | "reports" | "team" | "billing" | "settings";
+export type WorkspaceIconName = "home" | "inbox" | "calendar" | "clients" | "jobs" | "candidates" | "people" | "leave" | "performance" | "engagement" | "automations" | "reports" | "team" | "billing" | "settings";
 
-const groups: Array<{ label: string; links: Array<{ href: string; label: string; icon: IconName }> }> = [
+export const WORKSPACE_NAV_GROUPS: Array<{ label: string; links: Array<{ href: string; label: string; icon: WorkspaceIconName }> }> = [
   {
     label: "Operação",
     links: [
@@ -43,8 +43,8 @@ const groups: Array<{ label: string; links: Array<{ href: string; label: string;
   },
 ];
 
-function NavIcon({ name }: { name: IconName }) {
-  const paths: Record<IconName, React.ReactNode> = {
+export function WorkspaceNavIcon({ name }: { name: WorkspaceIconName }) {
+  const paths: Record<WorkspaceIconName, React.ReactNode> = {
     home: <><path d="M3 11.2 12 4l9 7.2" /><path d="M5.5 10v10h13V10M9.5 20v-6h5v6" /></>,
     inbox: <><path d="M4 4h16v14H4z" /><path d="M4 14h4l2 3h4l2-3h4M8 8h8M8 11h5" /></>,
     calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4M16 3v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" /></>,
@@ -64,10 +64,14 @@ function NavIcon({ name }: { name: IconName }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
 }
 
-export function WorkspaceNavigation() {
+export function WorkspaceNavigation({ activeHref, onNavigate }: { activeHref?: string; onNavigate?: (href: string) => void } = {}) {
   const pathname = usePathname();
-  return <nav className="workspace-nav" aria-label="Navegação principal">{groups.map(group => <div className="workspace-nav-group" key={group.label}><small>{group.label}</small>{group.links.map(link => {
-    const active = link.href === "/app" ? pathname === "/app" : pathname.startsWith(link.href);
-    return <Link href={link.href} className={active ? "active" : ""} aria-current={active ? "page" : undefined} key={link.href}><span className="workspace-nav-icon"><NavIcon name={link.icon} /></span><span>{link.label}</span>{active && <i />}</Link>;
+  const currentPath = activeHref ?? pathname;
+  return <nav className="workspace-nav" aria-label="Navegação principal">{WORKSPACE_NAV_GROUPS.map(group => <div className="workspace-nav-group" key={group.label}><small>{group.label}</small>{group.links.map(link => {
+    const active = link.href === "/app" ? currentPath === "/app" : currentPath.startsWith(link.href);
+    const content = <><span className="workspace-nav-icon"><WorkspaceNavIcon name={link.icon} /></span><span className="workspace-nav-label">{link.label}</span>{active && <i />}</>;
+    return onNavigate
+      ? <button type="button" title={link.label} onClick={() => onNavigate(link.href)} className={active ? "active" : ""} aria-current={active ? "page" : undefined} key={link.href}>{content}</button>
+      : <Link href={link.href} title={link.label} className={active ? "active" : ""} aria-current={active ? "page" : undefined} key={link.href}>{content}</Link>;
   })}</div>)}</nav>;
 }
