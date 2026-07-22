@@ -26,3 +26,27 @@ export function canManageCrm(role: string) {
 export function canManageRecruitment(role: string) {
   return ["owner", "admin", "recruiter", "hr", "manager", "member"].includes(role);
 }
+
+export function canViewPeople(role: string) {
+  return ["owner", "admin", "hr", "manager"].includes(role);
+}
+
+export function canManagePeople(role: string) {
+  return ["owner", "admin", "hr"].includes(role);
+}
+
+export function canManageEmployeeDocuments(role: string) {
+  return ["owner", "admin", "hr"].includes(role);
+}
+
+export function canViewPerformance(role: string) {
+  return ["owner", "admin", "hr", "manager"].includes(role);
+}
+
+export function canManagePerformance(role: string) {
+  return ["owner", "admin", "hr"].includes(role);
+}
+
+export function canReviewPerformance(role: string) {
+  return ["owner", "admin", "hr", "manager"].includes(role);
+}

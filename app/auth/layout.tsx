@@ -6,7 +6,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <main className="auth-page">
       <Link className="auth-back" href="/">← Voltar ao site</Link>
       <aside className="auth-aside">
-        <Link className="auth-brand" href="/">prismae</Link>
+        <Link className="auth-brand" href="/"><span className="auth-brand-mark"><i /></span><span>Prismae</span><small>People OS</small></Link>
         <div className="auth-aside-copy">
           <small>People OS</small>
           <h1>Uma operação de pessoas realmente conectada.</h1>

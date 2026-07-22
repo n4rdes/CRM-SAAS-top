@@ -140,7 +140,7 @@ function DashboardMock() {
       </div>
       <div className="dashboard-body">
         <aside className="mock-sidebar">
-          {['Visão geral', 'Clientes', 'Vagas', 'Candidatos', 'Pessoas', 'Relatórios', 'Automações'].map((item, index) => (
+          {['Visão geral', 'Agenda', 'Clientes', 'Vagas', 'Candidatos', 'Pessoas', 'Desempenho', 'Relatórios'].map((item, index) => (
             <span key={item} className={index === 0 ? "active" : ""}><i />{item}</span>
           ))}
         </aside>
