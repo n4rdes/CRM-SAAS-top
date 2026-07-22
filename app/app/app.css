@@ -173,7 +173,7 @@
 .workspace-signout:hover { color: #a44336; border-color: #efcfc8; background: #fff7f5; }
 .workspace-signout svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .workspace-signout span { display: none; }
-.workspace-sidebar-toggle { width: 29px; height: 29px; padding: 0; position: absolute; top: 26px; right: -15px; z-index: 3; display: grid; place-items: center; border: 1px solid #dfe3ee; border-radius: 9px; color: #677083; background: #fff; box-shadow: 0 6px 18px rgba(30,39,72,.11); cursor: pointer; transition: color .16s, border-color .16s, background .16s, transform .24s ease; }
+.workspace-sidebar-toggle { width: 29px; height: 29px; padding: 0; position: absolute; top: 26px; right: 4px; z-index: 3; display: grid; place-items: center; border: 1px solid #dfe3ee; border-radius: 9px; color: #677083; background: #fff; box-shadow: 0 6px 18px rgba(30,39,72,.11); cursor: pointer; transition: color .16s, border-color .16s, background .16s, transform .24s ease; }
 .workspace-sidebar-toggle:hover { color: var(--app-primary); border-color: #c7d0f3; background: #f7f9ff; }
 .workspace-sidebar-toggle svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .dashboard-metric-grid { grid-template-columns: repeat(4,1fr); }.dashboard-quick-links { grid-template-columns: repeat(3,1fr); }
@@ -272,7 +272,7 @@
 .workspace.sidebar-collapsed { grid-template-columns: 78px minmax(0,1fr); }
 .workspace.sidebar-collapsed .workspace-sidebar { width: 78px; padding-inline: 10px; }
 .workspace.sidebar-collapsed .workspace-sidebar-toggle { transform: rotate(180deg); }
-.workspace.sidebar-collapsed .workspace-brand { margin-inline: 13px; justify-content: center; }
+.workspace.sidebar-collapsed .workspace-brand { margin: 0 0 25px 3px; justify-content: flex-start; }
 .workspace.sidebar-collapsed .workspace-brand > span:last-child,
 .workspace.sidebar-collapsed .workspace-company > div,
 .workspace.sidebar-collapsed .workspace-nav-group > small,

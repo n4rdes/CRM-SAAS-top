@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import type Stripe from "stripe";
 import { getPlanCodeFromPriceIds, getStripePriceId } from "./config";
 import { getStripe } from "./stripe";
@@ -80,7 +81,7 @@ export async function syncStripeSubscription(subscription: Stripe.Subscription, 
   return { planCode, status: normalizedStatus, subscriptionId: subscription.id, tenantId };
 }
 
-export async function reconcileTenantSubscription(tenantId: string): Promise<BillingSyncResult | null> {
+export const reconcileTenantSubscription = cache(async function reconcileTenantSubscription(tenantId: string): Promise<BillingSyncResult | null> {
   if (!process.env.STRIPE_SECRET_KEY || !process.env.SUPABASE_SECRET_KEY) return null;
 
   const admin = createAdminClient();
@@ -102,4 +103,4 @@ export async function reconcileTenantSubscription(tenantId: string): Promise<Bil
   }
 
   return subscription ? syncStripeSubscription(subscription, tenantId) : null;
-}
+});
