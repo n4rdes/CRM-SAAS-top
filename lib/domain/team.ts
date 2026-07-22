@@ -38,3 +38,15 @@ export function canManagePeople(role: string) {
 export function canManageEmployeeDocuments(role: string) {
   return ["owner", "admin", "hr"].includes(role);
 }
+
+export function canViewPerformance(role: string) {
+  return ["owner", "admin", "hr", "manager"].includes(role);
+}
+
+export function canManagePerformance(role: string) {
+  return ["owner", "admin", "hr"].includes(role);
+}
+
+export function canReviewPerformance(role: string) {
+  return ["owner", "admin", "hr", "manager"].includes(role);
+}

@@ -49,7 +49,7 @@ export default async function EmployeeDetailPage({ params, searchParams }: { par
 
   return <div className="workspace-content wide-content">
     <Link className="back-link" href="/app/pessoas">← Voltar para Pessoas</Link>
-    <div className="page-heading"><div><h1>{employee.full_name}</h1><p>{position?.title ?? "Cargo não definido"} · {department?.name ?? "Sem departamento"}{manager ? ` · gestor: ${manager.full_name}` : ""}</p></div><span className={`status-badge employee-status-${employee.status}`}>{EMPLOYEE_STATUS_LABELS[employee.status as keyof typeof EMPLOYEE_STATUS_LABELS] ?? employee.status}</span></div>
+    <div className="page-heading"><div><h1>{employee.full_name}</h1><p>{position?.title ?? "Cargo não definido"} · {department?.name ?? "Sem departamento"}{manager ? ` · gestor: ${manager.full_name}` : ""}</p></div><div className="heading-actions"><Link className="performance-profile-link" href={`/app/desempenho/pessoas/${employee.id}`}>Ver desempenho →</Link><span className={`status-badge employee-status-${employee.status}`}>{EMPLOYEE_STATUS_LABELS[employee.status as keyof typeof EMPLOYEE_STATUS_LABELS] ?? employee.status}</span></div></div>
     {query.error && <div className="notice error-notice">{query.error}</div>}
     {query.success && <div className="notice">{query.success}</div>}
 

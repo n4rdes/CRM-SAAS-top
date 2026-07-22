@@ -1,0 +1,68 @@
+import Link from "next/link";
+import { SubmitButton } from "../_components/submit-button";
+import { createPerformanceCycle, createPerformanceGoal, updatePerformanceGoal } from "./actions";
+import { requireWorkspace } from "@/lib/auth/workspace";
+import { canManagePerformance, canViewPerformance } from "@/lib/domain/team";
+import { GOAL_CATEGORIES, GOAL_CATEGORY_LABELS, GOAL_STATUSES, GOAL_STATUS_LABELS, PERFORMANCE_CYCLE_STATUS_LABELS, ratingLabel } from "@/lib/domain/performance";
+
+type CycleRow = { id: string; name: string; description: string | null; status: string; starts_on: string; ends_on: string; review_due_on: string | null };
+type EmployeeRow = { id: string; full_name: string; status: string; department: { name: string } | null; position: { title: string } | null };
+type GoalRow = { id: string; employee_id: string; cycle_id: string | null; title: string; category: string; status: string; progress: number; weight: number; due_on: string | null; employee: { full_name: string } | null; cycle: { name: string } | null };
+type ReviewRow = { employee_id: string; cycle_id: string; status: string; overall_rating: number | null };
+type CheckinRow = { employee_id: string; happened_on: string };
+
+function formatDate(value: string) {
+  return new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR");
+}
+
+export default async function PerformancePage({ searchParams }: { searchParams: Promise<{ error?: string; success?: string; cycle?: string; status?: string; q?: string }> }) {
+  const query = await searchParams;
+  const { supabase, tenant, membership } = await requireWorkspace();
+  if (!canViewPerformance(membership.role)) return <div className="workspace-content"><div className="page-heading"><div><h1>Desempenho</h1><p>Metas, avaliações e desenvolvimento.</p></div></div><div className="notice error-notice">Sua função não possui acesso a Desempenho.</div></div>;
+  const canManage = canManagePerformance(membership.role);
+
+  const [cyclesResult, employeesResult, goalsResult, reviewsResult, checkinsResult] = await Promise.all([
+    supabase.from("performance_cycles").select("id,name,description,status,starts_on,ends_on,review_due_on").eq("tenant_id", tenant.id).order("starts_on", { ascending: false }),
+    supabase.from("employees").select("id,full_name,status,department:departments(name),position:positions(title)").eq("tenant_id", tenant.id).neq("status", "terminated").order("full_name"),
+    supabase.from("performance_goals").select("id,employee_id,cycle_id,title,category,status,progress,weight,due_on,employee:employees(full_name),cycle:performance_cycles(name)").eq("tenant_id", tenant.id).order("created_at", { ascending: false }),
+    supabase.from("performance_reviews").select("employee_id,cycle_id,status,overall_rating").eq("tenant_id", tenant.id),
+    supabase.from("performance_checkins").select("employee_id,happened_on").eq("tenant_id", tenant.id).order("happened_on", { ascending: false }),
+  ]);
+  const cycles = (cyclesResult.data ?? []) as CycleRow[];
+  const employees = (employeesResult.data ?? []) as unknown as EmployeeRow[];
+  const allGoals = (goalsResult.data ?? []) as unknown as GoalRow[];
+  const reviews = (reviewsResult.data ?? []) as ReviewRow[];
+  const checkins = (checkinsResult.data ?? []) as CheckinRow[];
+  const activeCycle = cycles.find(cycle => ["active", "calibration"].includes(cycle.status));
+  const search = (query.q ?? "").toLocaleLowerCase("pt-BR").trim();
+  const goals = allGoals.filter(goal => (!query.cycle || goal.cycle_id === query.cycle) && (!query.status || goal.status === query.status) && (!search || [goal.title, goal.employee?.full_name].filter(Boolean).some(value => String(value).toLocaleLowerCase("pt-BR").includes(search))));
+  const scoredGoals = allGoals.filter(goal => !["draft", "canceled"].includes(goal.status));
+  const weightedTotal = scoredGoals.reduce((sum, goal) => sum + goal.progress * goal.weight, 0);
+  const weightTotal = scoredGoals.reduce((sum, goal) => sum + goal.weight, 0);
+  const averageProgress = weightTotal ? Math.round(weightedTotal / weightTotal) : 0;
+  const atRisk = allGoals.filter(goal => goal.status === "at_risk" || (goal.due_on && goal.progress < 100 && goal.due_on < new Date().toISOString().slice(0, 10))).length;
+  const activeReviews = activeCycle ? reviews.filter(review => review.cycle_id === activeCycle.id) : [];
+  const pendingReviews = activeReviews.filter(review => review.status === "draft").length;
+  const submittedRatings = activeReviews.filter(review => review.status !== "draft" && review.overall_rating).map(review => Number(review.overall_rating));
+  const averageRating = submittedRatings.length ? submittedRatings.reduce((sum, rating) => sum + rating, 0) / submittedRatings.length : null;
+
+  return <div className="workspace-content wide-content">
+    <div className="page-heading"><div><h1>Desempenho</h1><p>OKRs, ciclos de avaliação, 1:1 e desenvolvimento em um único lugar.</p></div>{activeCycle ? <Link className="plan-chip" href={`/app/desempenho/ciclos/${activeCycle.id}`}>{activeCycle.name} · {PERFORMANCE_CYCLE_STATUS_LABELS[activeCycle.status as keyof typeof PERFORMANCE_CYCLE_STATUS_LABELS]}</Link> : <span className="record-count">Nenhum ciclo ativo</span>}</div>
+    {query.error && <div className="notice error-notice">{query.error}</div>}
+    {query.success && <div className="notice">{query.success}</div>}
+    {cyclesResult.error && <div className="setup-notice"><strong>Módulo Desempenho aguardando configuração</strong><span>Execute a migração <code>202607220006_performance_growth.sql</code> no SQL Editor do Supabase.</span></div>}
+
+    <section className="metric-grid performance-metrics"><article className="metric-card"><small>Progresso ponderado</small><strong>{averageProgress}%</strong><em>{scoredGoals.length} meta(s) acompanhada(s)</em></article><article className="metric-card"><small>Metas em risco</small><strong>{atRisk}</strong><em>atrasadas ou sinalizadas</em></article><article className="metric-card"><small>Avaliações pendentes</small><strong>{pendingReviews}</strong><em>{activeReviews.length} no ciclo atual</em></article><article className="metric-card"><small>Nota média</small><strong>{averageRating ? averageRating.toFixed(1) : "—"}</strong><em>{ratingLabel(averageRating)}</em></article><article className="metric-card"><small>Check-ins 1:1</small><strong>{checkins.length}</strong><em>conversas registradas</em></article></section>
+
+    <section className="performance-setup-grid">
+      {canManage && <article className="panel performance-cycle-form"><div className="panel-heading"><div><h2>Novo ciclo de avaliação</h2><p>Prepare o período e lance as avaliações quando estiver pronto.</p></div></div><form className="record-form cycle-create-form" action={createPerformanceCycle}><label>Nome do ciclo<input name="name" placeholder="Ex.: Ciclo 2º semestre 2026" required /></label><label>Início<input name="starts_on" type="date" required /></label><label>Término<input name="ends_on" type="date" required /></label><label>Prazo das avaliações<input name="review_due_on" type="date" /></label><label className="full-field">Descrição<textarea name="description" rows={3} placeholder="Objetivo e regras do ciclo" /></label><SubmitButton className="full-field" pendingLabel="Criando ciclo...">Criar ciclo em rascunho</SubmitButton></form></article>}
+      <article className="panel performance-goal-form"><div className="panel-heading"><div><h2>Nova meta</h2><p>Conecte uma pessoa a um resultado mensurável.</p></div></div><form className="record-form goal-create-form" action={createPerformanceGoal}><input type="hidden" name="return_to" value="/app/desempenho" /><label>Colaborador<select name="employee_id" required><option value="">Selecione</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.full_name}</option>)}</select></label><label>Ciclo<select name="cycle_id"><option value="">Sem ciclo</option>{cycles.filter(cycle => !["closed", "canceled"].includes(cycle.status)).map(cycle => <option key={cycle.id} value={cycle.id}>{cycle.name}</option>)}</select></label><label className="full-field">Meta<input name="title" placeholder="Ex.: reduzir o tempo de fechamento em 20%" required /></label><label>Categoria<select name="category">{GOAL_CATEGORIES.map(category => <option key={category} value={category}>{GOAL_CATEGORY_LABELS[category]}</option>)}</select></label><label>Peso (%)<input name="weight" type="number" min="1" max="100" defaultValue="100" /></label><label>Início<input name="starts_on" type="date" /></label><label>Prazo<input name="due_on" type="date" /></label><label className="full-field">Descrição<textarea name="description" rows={2} /></label><SubmitButton className="full-field" pendingLabel="Criando meta...">Criar meta</SubmitButton></form></article>
+    </section>
+
+    <section className="panel performance-cycles"><div className="panel-heading"><div><h2>Ciclos de avaliação</h2><p>Planejamento, execução, calibração e histórico.</p></div></div>{cycles.length ? <div className="cycle-list">{cycles.map(cycle => { const cycleReviews = reviews.filter(review => review.cycle_id === cycle.id); const complete = cycleReviews.filter(review => review.status !== "draft").length; return <Link href={`/app/desempenho/ciclos/${cycle.id}`} key={cycle.id}><span className={`cycle-status cycle-${cycle.status}`}>{PERFORMANCE_CYCLE_STATUS_LABELS[cycle.status as keyof typeof PERFORMANCE_CYCLE_STATUS_LABELS]}</span><div><strong>{cycle.name}</strong><small>{formatDate(cycle.starts_on)} até {formatDate(cycle.ends_on)} · {complete}/{cycleReviews.length} avaliações enviadas</small></div><b>→</b></Link>; })}</div> : <div className="empty-state compact">Crie o primeiro ciclo para organizar avaliações periódicas.</div>}</section>
+
+    <section className="panel performance-goals-board"><div className="panel-heading"><div><h2>Portfólio de metas</h2><p>{goals.length} resultado(s) com os filtros atuais.</p></div></div><form className="list-filters performance-filters"><input name="q" defaultValue={query.q ?? ""} placeholder="Buscar meta ou colaborador" /><select name="cycle" defaultValue={query.cycle ?? ""}><option value="">Todos os ciclos</option>{cycles.map(cycle => <option key={cycle.id} value={cycle.id}>{cycle.name}</option>)}</select><select name="status" defaultValue={query.status ?? ""}><option value="">Todos os status</option>{GOAL_STATUSES.map(status => <option key={status} value={status}>{GOAL_STATUS_LABELS[status]}</option>)}</select><button type="submit">Filtrar</button><Link href="/app/desempenho">Limpar</Link></form>{goals.length ? <div className="goal-board-list">{goals.map(goal => <article key={goal.id}><div className="goal-title"><span>{GOAL_CATEGORY_LABELS[goal.category as keyof typeof GOAL_CATEGORY_LABELS]}</span><div><Link href={`/app/desempenho/pessoas/${goal.employee_id}`}><strong>{goal.title}</strong></Link><small>{goal.employee?.full_name ?? "Colaborador"} · {goal.cycle?.name ?? "Sem ciclo"}{goal.due_on ? ` · até ${formatDate(goal.due_on)}` : ""}</small></div><em className={`goal-status goal-${goal.status}`}>{GOAL_STATUS_LABELS[goal.status as keyof typeof GOAL_STATUS_LABELS]}</em></div><div className="goal-progress"><i><b style={{ width: `${goal.progress}%` }} /></i><strong>{goal.progress}%</strong></div><form action={updatePerformanceGoal} className="goal-quick-update"><input type="hidden" name="goal_id" value={goal.id} /><input type="hidden" name="employee_id" value={goal.employee_id} /><input type="hidden" name="return_to" value="/app/desempenho" /><select name="status" defaultValue={goal.status}>{GOAL_STATUSES.filter(status => status !== "draft").map(status => <option key={status} value={status}>{GOAL_STATUS_LABELS[status]}</option>)}</select><input name="progress" type="number" min="0" max="100" defaultValue={goal.progress} /><SubmitButton pendingLabel="...">Atualizar</SubmitButton></form></article>)}</div> : <div className="empty-state">Nenhuma meta encontrada.</div>}</section>
+
+    <section className="panel performance-team"><div className="panel-heading"><div><h2>Radar da equipe</h2><p>Progresso, última nota e cadência de 1:1 por pessoa.</p></div></div><div className="performance-team-list">{employees.map(employee => { const employeeGoals = allGoals.filter(goal => goal.employee_id === employee.id && !["draft", "canceled"].includes(goal.status)); const progress = employeeGoals.length ? Math.round(employeeGoals.reduce((sum, goal) => sum + goal.progress, 0) / employeeGoals.length) : 0; const ratings = reviews.filter(review => review.employee_id === employee.id && review.status !== "draft" && review.overall_rating).map(review => Number(review.overall_rating)); const rating = ratings.length ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length : null; const latest = checkins.find(checkin => checkin.employee_id === employee.id); return <Link href={`/app/desempenho/pessoas/${employee.id}`} key={employee.id}><span className="employee-avatar">{employee.full_name.split(" ").slice(0,2).map(part => part[0]).join("").toUpperCase()}</span><div><strong>{employee.full_name}</strong><small>{employee.position?.title ?? "Cargo não definido"} · {employee.department?.name ?? "Sem departamento"}</small></div><span>{progress}% metas</span><span>{rating ? `${rating.toFixed(1)} · ${ratingLabel(rating)}` : "Sem nota"}</span><time>{latest ? `1:1 em ${formatDate(latest.happened_on)}` : "Sem check-in"}</time><b>→</b></Link>; })}{!employees.length && <div className="empty-state compact">Cadastre colaboradores para iniciar a gestão de desempenho.</div>}</div></section>
+  </div>;
+}
