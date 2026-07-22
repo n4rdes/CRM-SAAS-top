@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SubmitButton } from "../../../_components/submit-button";
 import { createPerformanceCheckin, createPerformanceGoal, submitPerformanceReview, updatePerformanceGoal } from "../../actions";
-import { requireWorkspace } from "@/lib/auth/workspace";
+import { requirePlanFeature } from "@/lib/subscriptions/server";
 import { canReviewPerformance, canViewPerformance } from "@/lib/domain/team";
 import { GOAL_CATEGORIES, GOAL_CATEGORY_LABELS, GOAL_STATUSES, GOAL_STATUS_LABELS, REVIEW_TYPE_LABELS, ratingLabel } from "@/lib/domain/performance";
 import { EMPLOYEE_STATUS_LABELS } from "@/lib/domain/people";
@@ -22,7 +22,7 @@ function scoreOptions() {
 
 export default async function EmployeePerformancePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const { supabase, tenant, membership } = await requireWorkspace();
+  const { supabase, tenant, membership } = await requirePlanFeature("/app/desempenho", "performance", "Desempenho");
   if (!canViewPerformance(membership.role)) return <div className="workspace-content"><div className="notice error-notice">Sua função não possui acesso a Desempenho.</div></div>;
   const canReview = canReviewPerformance(membership.role);
   const [employeeResult, cyclesResult, goalsResult, reviewsResult, checkinsResult, managersResult] = await Promise.all([

@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireActiveSubscription } from "@/lib/subscriptions/server";
+import { requirePlanFeature } from "@/lib/subscriptions/server";
 import { canManagePerformance, canReviewPerformance } from "@/lib/domain/team";
 import { isGoalCategory, isGoalStatus, isPerformanceCycleStatus, isReviewType } from "@/lib/domain/performance";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const requirePerformance = (path: string) => requirePlanFeature(path, "performance", "Desempenho");
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -58,7 +59,7 @@ export async function createPerformanceCycle(formData: FormData) {
   const startsOn = text(formData, "starts_on");
   const endsOn = text(formData, "ends_on");
   if (name.length < 3 || !startsOn || !endsOn || endsOn < startsOn) fail(path, "Revise o nome e as datas do ciclo.");
-  const { supabase, tenant, user, membership } = await requireActiveSubscription(path);
+  const { supabase, tenant, user, membership } = await requirePerformance(path);
   requirePerformanceAdmin(membership.role, path);
   const { data, error } = await supabase.from("performance_cycles").insert({
     tenant_id: tenant.id,
@@ -79,7 +80,7 @@ export async function updatePerformanceCycleStatus(formData: FormData) {
   const nextStatus = text(formData, "status");
   const path = `/app/desempenho/ciclos/${cycleId}`;
   if (!isUuid(cycleId) || !isPerformanceCycleStatus(nextStatus)) fail("/app/desempenho", "Ciclo inválido.");
-  const { supabase, tenant, membership } = await requireActiveSubscription(path);
+  const { supabase, tenant, membership } = await requirePerformance(path);
   requirePerformanceAdmin(membership.role, path);
   const { data: cycle } = await supabase.from("performance_cycles").select("status").eq("id", cycleId).eq("tenant_id", tenant.id).maybeSingle();
   if (!cycle) fail("/app/desempenho", "Ciclo não encontrado.");
@@ -116,7 +117,7 @@ export async function createPerformanceGoal(formData: FormData) {
   const dueOn = text(formData, "due_on");
   const weight = integer(text(formData, "weight"), 100);
   if (!isUuid(employeeId) || title.length < 3 || !isGoalCategory(category) || weight < 1 || weight > 100 || (startsOn && dueOn && dueOn < startsOn)) fail(path, "Revise os dados da meta.");
-  const { supabase, tenant, user, membership } = await requireActiveSubscription(path);
+  const { supabase, tenant, user, membership } = await requirePerformance(path);
   requireReviewer(membership.role, path);
   const cycleId = nullableUuid(text(formData, "cycle_id"));
   const { error } = await supabase.from("performance_goals").insert({
@@ -146,7 +147,7 @@ export async function updatePerformanceGoal(formData: FormData) {
   const status = text(formData, "status");
   const progress = integer(text(formData, "progress"), -1);
   if (!isUuid(goalId) || !isUuid(employeeId) || !isGoalStatus(status) || progress < 0 || progress > 100) fail(path, "Progresso da meta inválido.");
-  const { supabase, tenant, membership } = await requireActiveSubscription(path);
+  const { supabase, tenant, membership } = await requirePerformance(path);
   requireReviewer(membership.role, path);
   const { data, error } = await supabase.from("performance_goals").update({ status, progress }).eq("id", goalId).eq("employee_id", employeeId).eq("tenant_id", tenant.id).select("cycle_id").maybeSingle();
   if (error || !data) fail(path, "Não foi possível atualizar a meta.");
@@ -165,7 +166,7 @@ export async function submitPerformanceReview(formData: FormData) {
   const collaboration = integer(text(formData, "collaboration_rating"), 0);
   const growth = integer(text(formData, "growth_rating"), 0);
   if (!isUuid(employeeId) || !isUuid(cycleId) || !isReviewType(reviewType) || [overall, delivery, collaboration, growth].some(value => value < 1 || value > 5)) fail(path, "Preencha todas as notas da avaliação de 1 a 5.");
-  const { supabase, tenant, user, membership } = await requireActiveSubscription(path);
+  const { supabase, tenant, user, membership } = await requirePerformance(path);
   requireReviewer(membership.role, path);
   const { error } = await supabase.from("performance_reviews").upsert({
     tenant_id: tenant.id,
@@ -196,7 +197,7 @@ export async function createPerformanceCheckin(formData: FormData) {
   const mood = integer(text(formData, "mood"), 0);
   const energy = integer(text(formData, "energy"), 0);
   if (!isUuid(employeeId) || summary.length < 3 || mood < 1 || mood > 5 || energy < 1 || energy > 5) fail(path, "Registre resumo, humor e energia do check-in.");
-  const { supabase, tenant, user, membership } = await requireActiveSubscription(path);
+  const { supabase, tenant, user, membership } = await requirePerformance(path);
   requireReviewer(membership.role, path);
   const cycleId = nullableUuid(text(formData, "cycle_id"));
   const { error } = await supabase.from("performance_checkins").insert({

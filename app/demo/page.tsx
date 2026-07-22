@@ -3,17 +3,13 @@
 import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import { formatBRL, PLAN_CATALOG } from "@/lib/subscriptions";
+import { DashboardMetricIcon, type DashboardMetricKind } from "@/app/app/_components/dashboard-metric-icon";
+import { SidebarCollapseButton } from "@/app/app/_components/sidebar-collapse-button";
+import { WorkspaceNavigation } from "@/app/app/_components/workspace-navigation";
+import "../app/app.css";
 import "./demo.css";
 
-type Panel = "overview" | "crm" | "jobs" | "candidates" | "people" | "performance" | "engagement" | "automations" | "reports" | "subscription" | "security";
-
-const navGroups: { label: string; items: { id: Panel; label: string; icon: string; badge?: string }[] }[] = [
-  { label: "Principal", items: [{ id: "overview", label: "Visão geral", icon: "⌂" }, { id: "crm", label: "Comercial", icon: "◎", badge: "8" }] },
-  { label: "Talentos", items: [{ id: "jobs", label: "Vagas e processos", icon: "▱", badge: "12" }, { id: "candidates", label: "Candidatos", icon: "◉" }] },
-  { label: "Gestão de pessoas", items: [{ id: "people", label: "Colaboradores", icon: "♙" }, { id: "performance", label: "Desempenho e PDI", icon: "◇" }, { id: "engagement", label: "Clima e engajamento", icon: "♡" }] },
-  { label: "Inteligência", items: [{ id: "automations", label: "Automações", icon: "⎇" }, { id: "reports", label: "Relatórios", icon: "▤" }] },
-  { label: "Conta", items: [{ id: "subscription", label: "Plano e assinatura", icon: "◇" }, { id: "security", label: "Segurança e auditoria", icon: "⌾" }] },
-];
+type Panel = "overview" | "central" | "crm" | "jobs" | "candidates" | "people" | "timeoff" | "performance" | "engagement" | "automations" | "reports" | "subscription" | "security";
 
 const candidatesBase = [
   { name: "Fernanda Silva", initials: "FS", role: "Analista de RH Pleno", job: "Analista de RH", stage: "Entrevista", score: 92, source: "LinkedIn", owner: "Mariana", last: "Há 10 min" },
@@ -25,11 +21,13 @@ const candidatesBase = [
 ];
 
 const panelMeta: Record<Panel, { eyebrow: string; title: string; description: string }> = {
-  overview: { eyebrow: "Operação em tempo real", title: "Bom dia, Ana 👋", description: "Aqui está o que merece sua atenção hoje." },
+  overview: { eyebrow: "Operação em tempo real", title: "Visão geral", description: "Dados reais e isolados do ambiente DM Gestão." },
+  central: { eyebrow: "Central de trabalho", title: "O que precisa de você", description: "Notificações, aprovações, prazos e riscos reunidos por prioridade." },
   crm: { eyebrow: "CRM para consultorias", title: "Pipeline comercial", description: "Acompanhe oportunidades, propostas, contratos e receita prevista." },
   jobs: { eyebrow: "ATS colaborativo", title: "Vagas e processos seletivos", description: "Gerencie o funil, os SLAs e a comunicação de cada vaga." },
   candidates: { eyebrow: "Banco de talentos", title: "Candidatos", description: "Uma base pesquisável, atualizada e reutilizável em qualquer processo." },
   people: { eyebrow: "Jornada do colaborador", title: "Pessoas", description: "Documentos, contratos, férias e histórico em uma linha do tempo única." },
+  timeoff: { eyebrow: "RH operacional", title: "Férias & ausências", description: "Políticas, saldos, aprovações e calendário da equipe em uma única operação." },
   performance: { eyebrow: "Talento e sucessão", title: "Desempenho e desenvolvimento", description: "Ciclos, metas, 1:1, PDI, competências e matriz 9-box." },
   engagement: { eyebrow: "Escuta contínua", title: "Clima e engajamento", description: "Transforme pesquisas e feedbacks em planos de ação mensuráveis." },
   automations: { eyebrow: "Operação sem retrabalho", title: "Automações", description: "Gatilhos, condições e ações para manter cada processo em movimento." },
@@ -37,10 +35,6 @@ const panelMeta: Record<Panel, { eyebrow: string; title: string; description: st
   subscription: { eyebrow: "Plano Pro", title: "Assinatura e limites", description: "Acompanhe uso, faturas e os direitos liberados para sua empresa." },
   security: { eyebrow: "Controle e conformidade", title: "Segurança e auditoria", description: "Permissões, sessões, exportações e eventos sensíveis sob controle." },
 };
-
-function Logo() {
-  return <span className="demo-logo"><i><b /></i><strong>Prismae</strong><small>People OS</small></span>;
-}
 
 function Avatar({ initials, color = "blue" }: { initials: string; color?: string }) {
   return <span className={`avatar ${color}`}>{initials}</span>;
@@ -55,47 +49,50 @@ function Metric({ label, value, change, accent = "blue", note }: { label: string
 }
 
 function Overview({ onNavigate }: { onNavigate: (panel: Panel) => void }) {
-  return <>
-    <section className="demo-metrics">
-      <Metric label="Receita prevista" value="R$ 184,2 mil" change="18,4%" accent="blue" />
-      <Metric label="Vagas ativas" value="48" change="12,0%" accent="violet" />
-      <Metric label="Candidatos no funil" value="842" change="9,6%" accent="coral" />
-      <Metric label="Retenção em 12 meses" value="92,4%" change="5,2 p.p." accent="green" />
-    </section>
-    <section className="overview-grid">
-      <article className="panel recruitment-funnel">
-        <div className="panel-title"><div><span>Recrutamento</span><h3>Funil de candidatos</h3></div><button onClick={() => onNavigate("jobs")}>Ver processos →</button></div>
-        <div className="funnel-summary"><div><strong>842</strong><small>candidatos ativos</small></div><div><strong>32</strong><small>contratados no mês</small></div><div><strong>24 dias</strong><small>tempo médio</small></div></div>
-        <div className="funnel-track">
-          {[['Inscritos','842','100%'],['Triagem','412','48,9%'],['Entrevista','198','23,5%'],['Proposta','78','9,3%'],['Contratados','32','3,8%']].map(([stage,total,rate], index) => <div key={stage}><i style={{width:`${100-index*13}%`}} /><span>{stage}<b>{total}</b><small>{rate}</small></span></div>)}
-        </div>
-      </article>
-      <article className="panel today-panel">
-        <div className="panel-title"><div><span>Agenda</span><h3>Próximos compromissos</h3></div><button>Hoje⌄</button></div>
-        {[
-          ["09:30","Entrevista · Analista de Dados","Rafael Albuquerque","violet"],
-          ["11:00","Alinhamento de perfil","Acme Logística","blue"],
-          ["14:00","1:1 mensal","Beatriz Lima","coral"],
-          ["16:30","Apresentação de shortlist","Vértice Tech","green"],
-        ].map(([time,title,person,color]) => <div className="agenda-row" key={time}><time>{time}</time><i className={color} /><p><b>{title}</b><span>{person}</span></p><button>•••</button></div>)}
-      </article>
-      <article className="panel attention-panel">
-        <div className="panel-title"><div><span>Prioridades</span><h3>Precisa de atenção</h3></div><button>Ver tudo</button></div>
-        {[
-          ["7 vagas fora do SLA", "3 clientes aguardando avanço", "Vagas", "critical"],
-          ["12 documentos vencendo", "Nos próximos 30 dias", "Pessoas", "warning"],
-          ["4 aprovações pendentes", "Propostas e requisições", "Fluxos", "info"],
-        ].map(([title,text,tag,type]) => <div className="attention-row" key={title}><span className={type}>!</span><p><b>{title}</b><small>{text}</small></p><em>{tag}</em></div>)}
-      </article>
-      <article className="panel ai-insight-panel">
-        <div className="ai-orb">✦</div><span>Insight Prismae</span><h3>O gargalo desta semana está antes da entrevista.</h3><p>41% dos candidatos aprovados na triagem aguardam retorno do gestor há mais de 48 horas.</p><button onClick={() => onNavigate("reports")}>Analisar gargalo →</button>
-      </article>
-      <article className="panel revenue-panel">
-        <div className="panel-title"><div><span>Comercial</span><h3>Receita por cliente</h3></div><button onClick={() => onNavigate("crm")}>Abrir CRM →</button></div>
-        <div className="revenue-chart"><div className="chart-y"><span>200k</span><span>150k</span><span>100k</span><span>50k</span><span>0</span></div><div className="chart-bars">{[48,58,44,67,72,62,81,76,88,92,84,96].map((height,index)=><i key={index} style={{height:`${height}%`}} />)}</div></div>
-      </article>
-    </section>
-  </>;
+  const metrics: Array<{ kind: DashboardMetricKind; label: string; value: string; note: string }> = [
+    { kind: "clients", label: "Clientes no CRM", value: "18", note: "carteira comercial" },
+    { kind: "jobs", label: "Vagas ativas", value: "7", note: "vagas ilimitadas no Pro" },
+    { kind: "candidates", label: "Candidatos", value: "286", note: "banco de talentos" },
+    { kind: "pipeline", label: "No pipeline", value: "42", note: "6 contratações" },
+    { kind: "people", label: "Headcount", value: "84", note: "3 em admissão" },
+    { kind: "goals", label: "Metas", value: "74%", note: "9 avaliações pendentes" },
+    { kind: "engagement", label: "Clima & eNPS", value: "+61", note: "82% participação · 3 ações" },
+    { kind: "time_off", label: "Férias & ausências", value: "3", note: "4 solicitações pendentes" },
+  ];
+  const shortcuts: Array<[string, Panel]> = [["Abrir central de trabalho","central"],["Gerenciar clientes","crm"],["Pipeline de vagas","jobs"],["Gestão de Pessoas","people"],["Férias & ausências","timeoff"],["Desempenho","performance"],["Medir clima & eNPS","engagement"],["Configurar automações","automations"],["Organizar agenda","central"]];
+  return <div className="app-dashboard-preview">
+    <details className="view-customizer panel"><summary><span>Personalizar visão</span><small>Escolha cards e densidade do layout</small><b>＋</b></summary><div className="demo-view-options">{metrics.map(metric => <label key={metric.kind}><input type="checkbox" defaultChecked />{metric.label}</label>)}</div></details>
+    <section className="metric-grid dashboard-metric-grid dashboard-columns-4">{metrics.map(metric => <article className="metric-card" key={metric.kind}><DashboardMetricIcon kind={metric.kind} /><small>{metric.label}</small><strong>{metric.value}</strong><em>{metric.note}</em></article>)}</section>
+    <section className="dashboard-panels"><article className="panel"><h2>Ações rápidas</h2><p>Cadastre dados ou abra os módulos completos.</p><div className="quick-links dashboard-quick-links">{shortcuts.map(([label,panel],index) => <button key={label} onClick={() => onNavigate(panel)}><span>{String(index + 1).padStart(2,"0")}</span>{label}</button>)}</div></article><article className="panel subscription-summary"><h2>Assinatura</h2><p>Status: ativa · renovação em 22/08/2026</p><span className="plan-chip">Pro</span></article></section>
+    <section className="dashboard-operations"><article className="panel"><div className="panel-heading"><div><h2>Próximas atividades</h2><p>O que exige atenção da equipe.</p></div><button className="row-link" onClick={() => onNavigate("central")}>Ver agenda →</button></div><div className="dashboard-agenda">{[["Entrevista","Entrevista · Analista de Dados","Hoje, 09:30"],["Reunião","Alinhamento de perfil","Hoje, 11:00"],["1:1","Conversa mensal com Beatriz","Hoje, 14:00"]].map(([type,title,date]) => <div key={title}><span>{type}</span><strong>{title}</strong><time>{date}</time></div>)}</div></article><article className="panel"><div className="panel-heading"><div><h2>Saúde do pipeline</h2><p>Candidaturas por etapa.</p></div><button className="row-link" onClick={() => onNavigate("reports")}>Relatórios →</button></div><div className="mini-funnel">{[["Inscritos",42,100],["Triagem",31,74],["Entrevista",18,43],["Avaliação",10,24],["Proposta",6,14],["Contratados",6,14]].map(([label,count,width]) => <div key={String(label)}><span>{label}</span><i><b style={{width:`${width}%`}} /></i><strong>{count}</strong></div>)}</div></article></section>
+    <section className="panel activity-panel"><div className="panel-heading"><div><h2>Atividade recente</h2><p>Ações registradas automaticamente no ambiente.</p></div></div><div className="activity-list">{[["atualizou","vaga","Hoje, 10:42"],["criou","candidato","Hoje, 09:18"],["aprovou","solicitação de férias","Ontem, 17:36"]].map(([action,entity,date]) => <div key={`${action}-${entity}`}><span>{action}</span><strong>{entity}</strong><time>{date}</time></div>)}</div></section>
+  </div>;
+}
+
+function WorkCenter() {
+  const notifications = [
+    ["Nova solicitação de férias", "Júlia Ferreira pediu 5 dias a partir de 03/08.", "há 12 min", "action"],
+    ["Vaga fora do SLA", "Analista de Dados aguarda retorno do gestor há 3 dias.", "há 38 min", "warning"],
+    ["Onboarding concluído", "Rafael Souza finalizou todas as tarefas da jornada.", "há 2 h", "success"],
+    ["Documento perto do vencimento", "O exame ocupacional de Laura vence em 18 dias.", "ontem", "info"],
+  ];
+  const priorities = [
+    ["Atrasos", "7 atividades fora do prazo", "Abrir agenda", "red"],
+    ["Aprovações", "4 ausências aguardando decisão", "Revisar férias", "blue"],
+    ["Documentos", "12 vencimentos nos próximos 30 dias", "Ver pessoas", "coral"],
+    ["Jornadas", "6 tarefas de onboarding próximas do prazo", "Acompanhar", "green"],
+  ];
+  return <><section className="demo-work-center-hero"><div><span>4</span><p><b>notificações novas</b><small>direcionadas para você</small></p></div><div><span>29</span><p><b>pendências operacionais</b><small>ordenadas por risco e prazo</small></p></div><button>Organizar agenda →</button></section><section className="demo-work-center-layout"><article className="panel demo-notification-inbox"><div className="panel-title"><div><span>Caixa de entrada</span><h3>Atualizações importantes</h3></div><button>Marcar tudo como lido</button></div>{notifications.map(([title,body,time,kind])=><div className="demo-notification-row" key={title}><i className={kind}>{kind === "success" ? "✓" : kind === "warning" ? "!" : kind === "action" ? "→" : "i"}</i><p><b>{title}</b><span>{body}</span><small>{time}</small></p><button>Abrir</button></div>)}</article><aside className="demo-priority-grid">{priorities.map(([title,copy,action,color])=><article className="panel demo-priority-card" key={title}><header><i className={color}>!</i><div><h3>{title}</h3><p>{copy}</p></div></header><button>{action} →</button></article>)}</aside></section></>;
+}
+
+function TimeOff() {
+  const days = ["Qua 22", "Qui 23", "Sex 24", "Sáb 25", "Dom 26", "Seg 27", "Ter 28"];
+  const requests = [
+    ["Júlia Ferreira", "Férias", "03 ago — 07 ago", "5 dias", "JF", "Pendente"],
+    ["Carlos Almeida", "Folga compensatória", "31 jul", "1 dia", "CA", "Aprovada"],
+    ["Laura Martins", "Afastamento médico", "22 jul — 24 jul", "3 dias", "LM", "Aprovada"],
+  ];
+  return <><section className="demo-metrics compact"><Metric label="Aguardando aprovação" value="4" change="2 novas" accent="coral" note="desde ontem"/><Metric label="Ausentes hoje" value="3" change="2,3%" accent="violet" note="do headcount"/><Metric label="Próximas saídas" value="8" change="5 períodos" note="já aprovados"/><Metric label="Dias aprovados em 2026" value="184" change="12,4%" accent="green" note="vs. ano anterior"/></section><section className="demo-timeoff-layout"><article className="panel demo-team-calendar"><div className="panel-title"><div><span>Disponibilidade</span><h3>Calendário da equipe</h3></div><button>Próximos 14 dias⌄</button></div><div>{days.map((day,index)=><section className={index===0?"today":""} key={day}><header><b>{day}</b>{index===0&&<small>Hoje</small>}</header>{index===0&&<span className="coral"><b>Laura M.</b><small>Afastamento</small></span>}{index===1&&<span className="coral"><b>Laura M.</b><small>Afastamento</small></span>}{index===2&&<span className="coral"><b>Laura M.</b><small>Afastamento</small></span>}{index===5&&<span className="blue"><b>Carlos A.</b><small>Folga</small></span>}{![0,1,2,5].includes(index)&&<em>Livre</em>}</section>)}</div></article><article className="panel demo-leave-balance"><div className="panel-title"><div><span>Seu saldo</span><h3>Férias disponíveis</h3></div></div><strong>18,5 <small>dias</small></strong><i><b style={{width:"62%"}}/></i><p>30 dias de direito · 10 usados · 1,5 pendentes</p><button className="primary-action">＋ Nova solicitação</button></article></section><section className="panel demo-leave-requests"><div className="panel-title"><div><span>Fluxo de aprovação</span><h3>Solicitações recentes</h3></div><button>Ver histórico</button></div>{requests.map(([name,type,date,total,initials,status],index)=><div key={name}><Avatar initials={initials} color={["violet","blue","coral"][index]}/><p><b>{name}</b><span>{type} · {date}</span></p><strong>{total}</strong><em className={status==="Pendente"?"pending":"approved"}>{status}</em>{status==="Pendente"?<span><button>Rejeitar</button><button>Aprovar</button></span>:<button>•••</button>}</div>)}</section></>;
 }
 
 const crmColumns = [
@@ -280,14 +277,18 @@ function AIAssistant({ onClose }: { onClose: () => void }) {
 }
 
 export default function DemoPage() {
-  const [active,setActive]=useState<Panel>("overview"); const [sidebarOpen,setSidebarOpen]=useState(false); const [aiOpen,setAiOpen]=useState(false); const [addOpen,setAddOpen]=useState(false); const [toast,setToast]=useState(""); const [candidates,setCandidates]=useState(candidatesBase);
-  const go=(panel:Panel)=>{setActive(panel);setSidebarOpen(false);window.scrollTo({top:0,behavior:'smooth'})};
+  const panelPaths: Record<Panel,string> = { overview:"/app", central:"/app/central", crm:"/app/clientes", jobs:"/app/vagas", candidates:"/app/candidatos", people:"/app/pessoas", timeoff:"/app/ausencias", performance:"/app/desempenho", engagement:"/app/clima", automations:"/app/automacoes", reports:"/app/relatorios", subscription:"/app/assinatura", security:"/app/configuracoes" };
+  const pathPanels: Record<string,Panel> = { "/app":"overview", "/app/central":"central", "/app/agenda":"central", "/app/clientes":"crm", "/app/vagas":"jobs", "/app/candidatos":"candidates", "/app/pessoas":"people", "/app/ausencias":"timeoff", "/app/desempenho":"performance", "/app/clima":"engagement", "/app/automacoes":"automations", "/app/relatorios":"reports", "/app/equipe":"security", "/app/assinatura":"subscription", "/app/configuracoes":"security" };
+  const routeMeta: Record<string,{ eyebrow:string; title:string; description:string }> = { "/app/agenda":{eyebrow:"Organização da equipe",title:"Agenda",description:"Atividades, entrevistas, reuniões e próximos passos em uma visão única."}, "/app/equipe":{eyebrow:"Administração",title:"Equipe e permissões",description:"Convide pessoas e controle o acesso ao ambiente."}, "/app/configuracoes":{eyebrow:"Administração",title:"Configurações",description:"Dados da empresa, segurança e preferências do ambiente."} };
+  const [active,setActive]=useState<Panel>("overview"); const [activeHref,setActiveHref]=useState("/app"); const [aiOpen,setAiOpen]=useState(false); const [addOpen,setAddOpen]=useState(false); const [toast,setToast]=useState(""); const [candidates,setCandidates]=useState(candidatesBase);
+  const go=(panel:Panel)=>{setActive(panel);setActiveHref(panelPaths[panel]);window.scrollTo({top:0,behavior:'smooth'})};
+  const navigate=(href:string)=>{setActiveHref(href);setActive(pathPanels[href] ?? "overview");window.scrollTo({top:0,behavior:'smooth'})};
   const saveCandidate=(candidate:typeof candidatesBase[number])=>{setCandidates(current=>[candidate,...current]);setAddOpen(false);setToast(`${candidate.name} foi adicionado ao banco de talentos.`);setTimeout(()=>setToast(''),3200)};
-  const render=()=>{switch(active){case'overview':return <Overview onNavigate={go}/>;case'crm':return <CRM/>;case'jobs':return <Jobs/>;case'candidates':return <Candidates candidates={candidates} onAdd={()=>setAddOpen(true)}/>;case'people':return <People/>;case'performance':return <Performance/>;case'engagement':return <Engagement/>;case'automations':return <Automations/>;case'reports':return <Reports/>;case'subscription':return <Subscription/>;case'security':return <Security/>;}};
-  return <main className="demo-app">
-    <aside className={`demo-sidebar ${sidebarOpen?'open':''}`}><div className="sidebar-head"><Logo/><button onClick={()=>setSidebarOpen(false)}>×</button></div><div className="company-switch"><span>DM</span><div><b>DM Gestão</b><small>Plano Pro · Avaliação</small></div><button>⌄</button></div><nav>{navGroups.map(group=><div key={group.label}><small>{group.label}</small>{group.items.map(item=><button key={item.id} className={active===item.id?'active':''} onClick={()=>go(item.id)}><i>{item.icon}</i><span>{item.label}</span>{item.badge&&<em>{item.badge}</em>}</button>)}</div>)}</nav><div className="sidebar-upgrade"><span>✦</span><div><b>11 dias de avaliação</b><small>Configure a cobrança para manter o plano Pro.</small></div><button onClick={()=>go('subscription')}>Ver assinatura</button></div><Link className="back-site" href="/">← Voltar para o site</Link></aside>
-    <div className="demo-workspace"><header className="demo-topbar"><button className="sidebar-toggle" onClick={()=>setSidebarOpen(true)}>☰</button><div className="global-search">⌕<input placeholder="Buscar clientes, vagas, candidatos ou pessoas…"/><kbd>⌘ K</kbd></div><div className="top-actions"><button title="Ajuda">?</button><button className="notification" title="Notificações">♢<i>4</i></button><button className="new-button" onClick={()=>active==='candidates'?setAddOpen(true):setToast('Menu de criação rápida aberto.')}>＋ Novo</button><button className="profile"><Avatar initials="AM"/><span><b>Ana Moraes</b><small>Administrador</small></span>⌄</button></div></header><div className="demo-page-head"><div><p>{panelMeta[active].eyebrow}</p><h1>{panelMeta[active].title}</h1><span>{panelMeta[active].description}</span></div><div><button className="ghost-action">⇩ Exportar</button><button className="ai-action" onClick={()=>setAiOpen(true)}>✦ Perguntar à IA</button></div></div><div className="demo-content">{render()}</div></div>
-    <button className="floating-ai" onClick={()=>setAiOpen(true)} aria-label="Abrir assistente Prismae">✦<span>IA</span></button>
+  const render=()=>{switch(active){case'overview':return <Overview onNavigate={go}/>;case'central':return <WorkCenter/>;case'crm':return <CRM/>;case'jobs':return <Jobs/>;case'candidates':return <Candidates candidates={candidates} onAdd={()=>setAddOpen(true)}/>;case'people':return <People/>;case'timeoff':return <TimeOff/>;case'performance':return <Performance/>;case'engagement':return <Engagement/>;case'automations':return <Automations/>;case'reports':return <Reports/>;case'subscription':return <Subscription/>;case'security':return <Security/>;}};
+  const currentMeta = routeMeta[activeHref] ?? panelMeta[active];
+  return <main className="demo-app workspace">
+    <aside className="workspace-sidebar"><SidebarCollapseButton/><Link href="/demo" className="workspace-brand"><span className="workspace-brand-mark"><i /></span><span><strong>Prismae</strong><small>People OS</small></span></Link><div className="workspace-company"><span className="workspace-company-icon">D</span><div><small>Ambiente atual</small><strong>DM Gestão</strong><span>Administrador</span></div></div><WorkspaceNavigation activeHref={activeHref} onNavigate={navigate}/><div className="workspace-sidebar-footer"><div className="workspace-sidebar-user"><span>AM</span><div><strong>Ana Moraes</strong><small>ana@dmgestao.com.br</small></div></div><Link href="/" className="workspace-signout" aria-label="Sair da demonstração" title="Sair da demonstração"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5" /></svg><span>Sair</span></Link></div></aside>
+    <div className="workspace-main"><header className="workspace-topbar"><div className="topbar-context"><small>PRISMAE PEOPLE OS</small><strong>DM Gestão</strong></div><div className="topbar-actions"><button className="topbar-agenda" onClick={()=>{navigate('/app/agenda');setToast('Nova atividade aberta na agenda.')}}><span>＋</span> Nova atividade</button><button className="topbar-notifications" title="Notificações" aria-label="4 notificações não lidas" onClick={()=>navigate('/app/central')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg><span>4</span></button><button className="topbar-plan" onClick={()=>navigate('/app/assinatura')}>Plano Pro</button><span className="workspace-user-avatar">AM</span></div></header><div className="workspace-content demo-shared-content"><div className="page-heading"><div><p className="page-eyebrow">{currentMeta.eyebrow}</p><h1>{currentMeta.title}</h1><p>{currentMeta.description}</p></div><div className="demo-heading-actions">{active==='reports'&&<button className="secondary-button">⇩ Exportar planilha</button>}{active==='candidates'&&<button className="secondary-button" onClick={()=>setAddOpen(true)}>＋ Novo candidato</button>}{active==='overview'&&<button className="secondary-button" onClick={()=>setAiOpen(true)}>✦ Consultar operação</button>}</div></div><div className="demo-module-content">{render()}</div></div></div>
     {aiOpen&&<><div className="drawer-backdrop" onClick={()=>setAiOpen(false)}/><AIAssistant onClose={()=>setAiOpen(false)}/></>}
     {addOpen&&<AddCandidateModal onClose={()=>setAddOpen(false)} onSave={saveCandidate}/>} {toast&&<div className="demo-toast"><span>✓</span>{toast}</div>}
   </main>;

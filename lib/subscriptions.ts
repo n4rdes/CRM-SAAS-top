@@ -4,6 +4,7 @@ export type FeatureCode =
   | "crm"
   | "ats"
   | "people"
+  | "time_off"
   | "performance"
   | "engagement"
   | "automations"
@@ -40,6 +41,7 @@ const commonFeatures: Record<FeatureCode, boolean> = {
   crm: true,
   ats: true,
   people: true,
+  time_off: true,
   performance: false,
   engagement: false,
   automations: false,
