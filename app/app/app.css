@@ -518,3 +518,7 @@
   .automation-rule-card footer{align-items:flex-start;flex-direction:column}.automation-rule-card footer>div{width:100%;flex-wrap:wrap}
   .billing-plan-header,.billing-plan>ul,.billing-plan-footer{padding-left:20px;padding-right:20px}
 }
+
+.document-scope-section { margin-top: 24px; }
+.document-scope-section > h3 { margin: 0 0 10px; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted, #64748b); }
+.document-list > div > div small + small { display: block; margin-top: 3px; }

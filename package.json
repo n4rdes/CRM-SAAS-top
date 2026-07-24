@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=22.0.0 <23"
   },
   "scripts": {
     "dev": "next dev --webpack",
@@ -12,7 +12,11 @@
     "lint": "eslint . --ignore-pattern .next --ignore-pattern dist",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run test && npm run typecheck && npm run lint && npm run build"
+    "check": "npm run security:check && npm run verify:migrations && npm run test && npm run typecheck && npm run lint && npm run build",
+    "verify:migrations": "node scripts/verify-migrations.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "security:check": "node scripts/security-check.mjs",
+    "test:integration:rls": "vitest run tests/rls.integration.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
@@ -38,5 +42,6 @@
     "sharp": "0.35.3"
   },
   "type": "module",
-  "displayName": "Prismae People OS"
+  "displayName": "Prismae People OS",
+  "packageManager": "npm@10.9.2"
 }

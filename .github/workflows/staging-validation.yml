@@ -1,0 +1,36 @@
+name: Prismae Staging Validation
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: prismae-staging-validation
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: staging
+    env:
+      NEXT_PUBLIC_APP_URL: ${{ vars.STAGING_APP_URL }}
+      SMOKE_BASE_URL: ${{ vars.STAGING_APP_URL }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.STAGING_SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_SECRET_KEY: ${{ secrets.STAGING_SUPABASE_SECRET_KEY }}
+      RUN_SUPABASE_INTEGRATION_TESTS: "1"
+      TEST_TENANT_A_EMAIL: ${{ secrets.TEST_TENANT_A_EMAIL }}
+      TEST_TENANT_A_PASSWORD: ${{ secrets.TEST_TENANT_A_PASSWORD }}
+      TEST_TENANT_B_EMAIL: ${{ secrets.TEST_TENANT_B_EMAIL }}
+      TEST_TENANT_B_PASSWORD: ${{ secrets.TEST_TENANT_B_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run security:check
+      - run: npm run verify:migrations
+      - run: npm run test:integration:rls
+      - run: npm run smoke
