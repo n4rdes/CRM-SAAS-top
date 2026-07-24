@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { signOut } from "@/app/auth/actions";
 import { requireWorkspace } from "@/lib/auth/workspace";
-import { isStripeConfigured } from "@/lib/billing/config";
-import { reconcileTenantSubscription } from "@/lib/billing/subscription-sync";
 import { TEAM_ROLE_LABELS } from "@/lib/domain/team";
 import { WorkspaceNavigation } from "./_components/workspace-navigation";
 import { SidebarCollapseButton } from "./_components/sidebar-collapse-button";
@@ -10,13 +8,6 @@ import "./app.css";
 
 export default async function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   const { supabase, tenant, user, membership } = await requireWorkspace();
-  if (isStripeConfigured() && process.env.SUPABASE_SECRET_KEY) {
-    try {
-      await reconcileTenantSubscription(tenant.id);
-    } catch (error) {
-      console.error("[stripe-sync] O topo usará o último plano salvo", error);
-    }
-  }
   const [{ data: subscription }, { count: unreadNotifications }] = await Promise.all([
     supabase.from("subscriptions").select("status,trial_ends_at,grace_ends_at,plan:plans(name)").eq("tenant_id", tenant.id).maybeSingle(),
     supabase.from("app_notifications").select("id", { count: "exact", head: true }).eq("tenant_id", tenant.id).eq("user_id", user.id).is("read_at", null),

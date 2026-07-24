@@ -1,7 +1,8 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-export async function requireWorkspace() {
+const loadWorkspace = cache(async () => {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
@@ -13,7 +14,6 @@ export async function requireWorkspace() {
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
-
   if (!membership) redirect("/onboarding");
 
   const { data: tenant } = await supabase
@@ -21,7 +21,11 @@ export async function requireWorkspace() {
     .select("id, name, slug")
     .eq("id", membership.tenant_id)
     .single();
-
   if (!tenant) redirect("/onboarding");
+
   return { supabase, user, membership, tenant };
+});
+
+export async function requireWorkspace() {
+  return loadWorkspace();
 }

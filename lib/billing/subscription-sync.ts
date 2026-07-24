@@ -1,6 +1,6 @@
 import "server-only";
-import { cache } from "react";
 import type Stripe from "stripe";
+import { randomUUID } from "node:crypto";
 import { getPlanCodeFromPriceIds, getStripePriceId } from "./config";
 import { getStripe } from "./stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -12,6 +12,14 @@ export type BillingSyncResult = {
   status: string;
   subscriptionId: string;
   tenantId: string;
+  applied: boolean;
+};
+
+type SyncContext = {
+  eventId: string;
+  eventCreatedAt: Date;
+  eventPriority?: number;
+  force?: boolean;
 };
 
 export function normalizeSubscriptionStatus(status: Stripe.Subscription.Status) {
@@ -46,7 +54,11 @@ async function findTenantId(admin: AdminClient, subscription: Stripe.Subscriptio
   return byCustomer.data?.tenant_id ?? null;
 }
 
-export async function syncStripeSubscription(subscription: Stripe.Subscription, expectedTenantId?: string): Promise<BillingSyncResult> {
+export async function syncStripeSubscription(
+  subscription: Stripe.Subscription,
+  expectedTenantId?: string,
+  context?: SyncContext,
+): Promise<BillingSyncResult> {
   const admin = createAdminClient();
   const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
   const priceIds = subscription.items.data.map(item => item.price.id);
@@ -65,23 +77,40 @@ export async function syncStripeSubscription(subscription: Stripe.Subscription, 
     .filter((value): value is number => typeof value === "number")
     .sort((a, b) => b - a)[0];
   const normalizedStatus = normalizeSubscriptionStatus(subscription.status);
-  const { error } = await admin.from("subscriptions").update({
-    plan_id: plan.id,
-    status: normalizedStatus,
-    provider: "stripe",
-    provider_customer_id: customerId,
-    provider_subscription_id: subscription.id,
-    provider_price_id: priceId,
-    current_period_ends_at: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
-    cancel_at_period_end: subscription.cancel_at_period_end,
-    grace_ends_at: subscription.status === "past_due" ? new Date(Date.now() + 3 * 86_400_000).toISOString() : null,
-  }).eq("tenant_id", tenantId);
+  const syncContext: SyncContext = context ?? {
+    eventId: `manual:${randomUUID()}`,
+    eventCreatedAt: new Date(),
+    eventPriority: 100,
+    force: true,
+  };
+
+  const { data, error } = await admin.rpc("apply_stripe_subscription_event", {
+    p_tenant_id: tenantId,
+    p_plan_id: plan.id,
+    p_status: normalizedStatus,
+    p_customer_id: customerId,
+    p_subscription_id: subscription.id,
+    p_price_id: priceId,
+    p_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+    p_cancel_at_period_end: subscription.cancel_at_period_end,
+    p_grace_ends_at: subscription.status === "past_due" ? new Date(Date.now() + 3 * 86_400_000).toISOString() : null,
+    p_event_id: syncContext.eventId,
+    p_event_created_at: syncContext.eventCreatedAt.toISOString(),
+    p_event_priority: syncContext.eventPriority ?? 0,
+    p_force: syncContext.force ?? false,
+  });
   if (error) throw error;
 
-  return { planCode, status: normalizedStatus, subscriptionId: subscription.id, tenantId };
+  return {
+    planCode,
+    status: normalizedStatus,
+    subscriptionId: subscription.id,
+    tenantId,
+    applied: Boolean(data),
+  };
 }
 
-export const reconcileTenantSubscription = cache(async function reconcileTenantSubscription(tenantId: string): Promise<BillingSyncResult | null> {
+export async function reconcileTenantSubscription(tenantId: string): Promise<BillingSyncResult | null> {
   if (!process.env.STRIPE_SECRET_KEY || !process.env.SUPABASE_SECRET_KEY) return null;
 
   const admin = createAdminClient();
@@ -103,4 +132,4 @@ export const reconcileTenantSubscription = cache(async function reconcileTenantS
   }
 
   return subscription ? syncStripeSubscription(subscription, tenantId) : null;
-});
+}

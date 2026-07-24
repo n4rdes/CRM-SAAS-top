@@ -2,7 +2,6 @@ import { openBillingPortal, startCheckout, syncBillingSubscription } from "./act
 import { SubmitButton } from "../_components/submit-button";
 import { requireWorkspace } from "@/lib/auth/workspace";
 import { isStripeConfigured } from "@/lib/billing/config";
-import { reconcileTenantSubscription } from "@/lib/billing/subscription-sync";
 import { canManageTeam } from "@/lib/domain/team";
 
 const STATUS_LABELS: Record<string, string> = { trialing: "Período de avaliação", active: "Ativa", past_due: "Pagamento pendente", grace: "Prazo de regularização", suspended: "Suspensa", canceled: "Cancelada" };
@@ -28,15 +27,6 @@ export default async function SubscriptionPage({ searchParams }: { searchParams:
   const { supabase, tenant, membership } = await requireWorkspace();
   const manager = canManageTeam(membership.role);
   const configured = isStripeConfigured();
-  let reconciliationFailed = false;
-  if (manager && configured && process.env.SUPABASE_SECRET_KEY) {
-    try {
-      await reconcileTenantSubscription(tenant.id);
-    } catch (error) {
-      reconciliationFailed = true;
-      console.error("[stripe-sync] Não foi possível reconciliar a tela de assinatura", error);
-    }
-  }
   const [subscriptionResult, plansResult, membersResult, jobsResult] = await Promise.all([
     supabase.from("subscriptions").select("status,trial_ends_at,current_period_ends_at,cancel_at_period_end,provider_customer_id,plan:plans(code,name,price_monthly_cents,limits)").eq("tenant_id", tenant.id).single(),
     supabase.from("plans").select("code,name,price_monthly_cents,limits").eq("active", true).order("price_monthly_cents", { ascending: true, nullsFirst: false }),
@@ -52,8 +42,7 @@ export default async function SubscriptionPage({ searchParams }: { searchParams:
     {params.error && <div className="notice error-notice">{params.error}</div>}
     {params.checkout === "success" && <div className="notice">Pagamento concluído. A confirmação da assinatura pode levar alguns segundos.</div>}
     {params.sync === "success" && <div className="notice">Assinatura sincronizada com a Stripe. O plano {params.plan?.toUpperCase()} já está ativo no sistema.</div>}
-    {params.portal === "return" && !reconciliationFailed && <div className="notice">Alterações da Stripe conferidas e sincronizadas.</div>}
-    {reconciliationFailed && <div className="notice error-notice">Não conseguimos conferir a Stripe agora. Você pode tentar novamente pelo botão “Sincronizar Stripe”.</div>}
+    {params.portal === "return" && <div className="notice">Alterações recebidas. O webhook da Stripe atualizará o plano; use “Sincronizar Stripe” apenas se necessário.</div>}
     {params.checkout === "canceled" && <div className="notice error-notice">Checkout cancelado. Nenhuma cobrança foi realizada.</div>}
     {!configured && manager && <div className="setup-notice"><strong>Modo de preparação</strong><span>Os planos já estão funcionais, mas o Stripe ainda precisa das chaves para receber pagamentos.</span></div>}
     <section className="current-subscription panel"><div><small>PLANO ATUAL</small><h2>{currentPlan?.name ?? "Basic"}</h2><p>{STATUS_LABELS[subscription?.status ?? ""] ?? "Status indisponível"}{endDate ? ` · próximo marco em ${new Date(endDate).toLocaleDateString("pt-BR")}` : ""}</p></div><div className="usage-summary"><div><span>Usuários</span><strong>{membersResult.count ?? 0}{typeof currentPlan?.limits?.users === "number" ? `/${currentPlan.limits.users}` : ""}</strong></div><div><span>Vagas ativas</span><strong>{jobsResult.count ?? 0}{typeof currentPlan?.limits?.active_jobs === "number" ? `/${currentPlan.limits.active_jobs}` : ""}</strong></div></div>{manager && subscription?.provider_customer_id && <div className="billing-management-actions"><form action={syncBillingSubscription}><SubmitButton className="secondary-button" pendingLabel="Sincronizando...">Sincronizar Stripe</SubmitButton></form><form action={openBillingPortal}><SubmitButton pendingLabel="Abrindo...">Gerenciar cobrança</SubmitButton></form></div>}</section>

@@ -1,13 +1,13 @@
+import { getAppUrl } from "@/lib/http/app-url";
+
+export { getAppUrl };
+
 export const BILLING_PLAN_CODES = ["basic", "pro"] as const;
 
 export type BillingPlanCode = (typeof BILLING_PLAN_CODES)[number];
 
 export function isBillingPlanCode(value: string): value is BillingPlanCode {
   return BILLING_PLAN_CODES.includes(value as BillingPlanCode);
-}
-
-export function getAppUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 }
 
 export function getStripePriceId(planCode: BillingPlanCode) {

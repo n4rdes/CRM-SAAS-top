@@ -7,15 +7,10 @@ import { requireWorkspace } from "@/lib/auth/workspace";
 import { canManageEmployeeDocuments, canManagePeople, canViewPeople } from "@/lib/domain/team";
 import { isDocumentCategory, isEmployeeStatus, isEmploymentType, isWorkflowKind, isWorkModel } from "@/lib/domain/people";
 import { requireActiveSubscription } from "@/lib/subscriptions/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { MAX_DOCUMENT_SIZE, scanDocument, validateDocumentFile } from "@/lib/security/files";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const DOCUMENT_MIME_TYPES = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-]);
-const MAX_DOCUMENT_SIZE = 8 * 1024 * 1024;
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -248,35 +243,72 @@ export async function uploadEmployeeDocument(formData: FormData) {
   const employeeId = text(formData, "employee_id");
   const path = `/app/pessoas/${employeeId}`;
   const category = text(formData, "category");
+  const documentScope = text(formData, "document_scope");
   const title = text(formData, "title");
   const file = formData.get("file");
-  if (!isUuid(employeeId) || !isDocumentCategory(category) || title.length < 2 || !(file instanceof File) || file.size === 0) fail(path, "Selecione um documento válido.");
+  if (!isUuid(employeeId) || !isDocumentCategory(category) || !["personal", "company"].includes(documentScope) || title.length < 2 || !(file instanceof File) || file.size === 0) {
+    fail(path, "Selecione um documento válido.");
+  }
   if (file.size > MAX_DOCUMENT_SIZE) fail(path, "O documento deve ter no máximo 8 MB.");
-  if (!DOCUMENT_MIME_TYPES.has(file.type)) fail(path, "Formato não permitido. Envie PDF, JPG, PNG ou DOCX.");
+  if (!(await validateDocumentFile(file))) fail(path, "O conteúdo do arquivo não corresponde ao formato informado.");
+
   const { supabase, tenant, user, membership } = await requireActiveSubscription(path);
   if (!canManageEmployeeDocuments(membership.role)) fail(path, "Sua função não permite acessar documentos de colaboradores.");
+
+  let scanResult;
+  try {
+    scanResult = await scanDocument(file);
+  } catch (error) {
+    const message = error instanceof Error && error.message === "DOCUMENT_SCANNER_NOT_CONFIGURED"
+      ? "O antivírus de documentos é obrigatório em produção e ainda não foi configurado."
+      : "Não foi possível validar o documento no antivírus. Tente novamente.";
+    fail(path, message);
+  }
+  if (scanResult.status === "infected") fail(path, "O arquivo foi bloqueado pela verificação de segurança.");
+
   const safeName = file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "documento";
   const storagePath = `${tenant.id}/${employeeId}/${randomUUID()}-${safeName}`;
-  const { error: uploadError } = await supabase.storage.from("employee-documents").upload(storagePath, file, { contentType: file.type, upsert: false });
-  if (uploadError) fail(path, "Não foi possível enviar o arquivo. Confirme a migração 005 e o limite do documento.");
-  const { error } = await supabase.from("employee_documents").insert({
+  const { error: uploadError } = await supabase.storage.from("employee-documents").upload(storagePath, file, {
+    contentType: file.type,
+    cacheControl: "0",
+    upsert: false,
+  });
+  if (uploadError) fail(path, "Não foi possível enviar o arquivo. Confirme a migration 009 e o limite do documento.");
+
+  const { data: inserted, error } = await supabase.from("employee_documents").insert({
     tenant_id: tenant.id,
     employee_id: employeeId,
     category,
+    document_scope: documentScope,
     title,
-    file_name: file.name,
+    file_name: file.name.slice(0, 255),
     storage_path: storagePath,
     mime_type: file.type,
     size_bytes: file.size,
     expires_on: text(formData, "expires_on") || null,
+    retention_until: text(formData, "retention_until") || null,
     uploaded_by: user.id,
-  });
-  if (error) {
+    integrity_validated_at: new Date().toISOString(),
+    malware_scan_status: scanResult.status,
+    malware_scan_provider: scanResult.provider,
+    malware_scan_reference: scanResult.reference,
+    malware_scanned_at: scanResult.status === "not_configured" ? null : new Date().toISOString(),
+  }).select("id").single();
+  if (error || !inserted) {
     await supabase.storage.from("employee-documents").remove([storagePath]);
     fail(path, "O arquivo foi recebido, mas o registro não pôde ser salvo.");
   }
+
+  await createAdminClient().from("employee_document_access_logs").insert({
+    tenant_id: tenant.id,
+    document_id: inserted.id,
+    employee_id: employeeId,
+    actor_id: user.id,
+    action: "upload",
+    metadata: { scope: documentScope, category, scan_status: scanResult.status },
+  });
   revalidatePeople();
-  done(path, "Documento enviado com acesso privado.");
+  done(path, scanResult.status === "clean" ? "Documento enviado e verificado com segurança." : "Documento enviado com acesso privado e auditoria ativa.");
 }
 
 export async function deleteEmployeeDocument(formData: FormData) {
@@ -284,14 +316,23 @@ export async function deleteEmployeeDocument(formData: FormData) {
   const documentId = text(formData, "document_id");
   const path = `/app/pessoas/${employeeId}`;
   if (!isUuid(employeeId) || !isUuid(documentId)) fail(path, "Documento inválido.");
-  const { supabase, tenant, membership } = await requireWorkspace();
+  const { supabase, tenant, user, membership } = await requireWorkspace();
   if (!canManageEmployeeDocuments(membership.role)) fail(path, "Sua função não permite excluir documentos.");
-  const { data: document } = await supabase.from("employee_documents").select("storage_path").eq("id", documentId).eq("employee_id", employeeId).eq("tenant_id", tenant.id).maybeSingle();
+  const { data: document } = await supabase.from("employee_documents").select("storage_path,file_name,document_scope,category").eq("id", documentId).eq("employee_id", employeeId).eq("tenant_id", tenant.id).maybeSingle();
   if (!document) fail(path, "Documento não encontrado.");
   const { error: storageError } = await supabase.storage.from("employee-documents").remove([document.storage_path]);
   if (storageError) fail(path, "Não foi possível remover o arquivo privado.");
+
+  await createAdminClient().from("employee_document_access_logs").insert({
+    tenant_id: tenant.id,
+    document_id: documentId,
+    employee_id: employeeId,
+    actor_id: user.id,
+    action: "delete",
+    metadata: { file_name: document.file_name, scope: document.document_scope, category: document.category },
+  });
   const { error } = await supabase.from("employee_documents").delete().eq("id", documentId).eq("employee_id", employeeId).eq("tenant_id", tenant.id);
   if (error) fail(path, "O arquivo foi removido, mas o registro precisa ser revisado.");
   revalidatePeople();
-  done(path, "Documento excluído.");
+  done(path, "Documento excluído e ação registrada na auditoria.");
 }
