@@ -1,14 +1,32 @@
-import { access, readFile } from "node:fs/promises";
-import { constants } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
-async function exists(path) {
-  try { await access(path, constants.F_OK); return true; } catch { return false; }
+const execFileAsync = promisify(execFile);
+
+const forbidden = [
+  ".env.local",
+  ".env.local.backup",
+  ".env.production",
+  ".env.production.local",
+];
+
+const { stdout } = await execFileAsync(
+  "git",
+  ["ls-files", "--", ...forbidden],
+  { windowsHide: true },
+);
+
+const trackedSensitiveFiles = stdout
+  .split(/\r?\n/)
+  .map((file) => file.trim())
+  .filter(Boolean);
+
+if (trackedSensitiveFiles.length > 0) {
+  throw new Error(
+    `Arquivos sensíveis rastreados pelo Git: ${trackedSensitiveFiles.join(", ")}`,
+  );
 }
-
-const forbidden = [".env.local", ".env.local.backup", ".env.production", ".env.production.local"];
-const found = [];
-for (const file of forbidden) if (await exists(file)) found.push(file);
-if (found.length) throw new Error(`Arquivos sensíveis presentes no pacote: ${found.join(", ")}`);
 
 const auth = await readFile("app/auth/actions.ts", "utf8");
 if (/x-forwarded-host|headers\(\).*host/s.test(auth)) throw new Error("Callbacks de autenticação ainda dependem de Host/X-Forwarded-Host.");
