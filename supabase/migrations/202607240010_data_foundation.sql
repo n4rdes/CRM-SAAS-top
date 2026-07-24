@@ -1,5 +1,5 @@
--- Prismae Data Foundation: importação, campos personalizados, busca, duplicidade e timeline.
-create extension if not exists pg_trgm;
+-- Prismae Data Foundation: importaÃƒÂ§ÃƒÂ£o, campos personalizados, busca, duplicidade e timeline.
+create extension if not exists pg_trgm with schema extensions;
 
 alter table public.tenants
   add column if not exists activation_completed_at timestamptz;
@@ -107,12 +107,12 @@ create index if not exists data_imports_tenant_created_idx on public.data_import
 create index if not exists data_import_rows_import_status_idx on public.data_import_rows(tenant_id, import_id, status, row_number);
 create index if not exists entity_events_entity_idx on public.entity_events(tenant_id, entity_type, entity_id, created_at desc);
 create index if not exists entity_events_created_idx on public.entity_events(tenant_id, created_at desc);
-create index if not exists candidates_name_trgm_idx on public.candidates using gin (full_name gin_trgm_ops);
-create index if not exists crm_companies_name_trgm_idx on public.crm_companies using gin (name gin_trgm_ops);
-create index if not exists jobs_title_trgm_idx on public.jobs using gin (title gin_trgm_ops);
-create index if not exists employees_name_trgm_idx on public.employees using gin (full_name gin_trgm_ops);
+create index if not exists candidates_name_trgm_idx on public.candidates using gin (full_name extensions.gin_trgm_ops);
+create index if not exists crm_companies_name_trgm_idx on public.crm_companies using gin (name extensions.gin_trgm_ops);
+create index if not exists jobs_title_trgm_idx on public.jobs using gin (title extensions.gin_trgm_ops);
+create index if not exists employees_name_trgm_idx on public.employees using gin (full_name extensions.gin_trgm_ops);
 
--- Proteções e auditoria padrão.
+-- ProteÃƒÂ§ÃƒÂµes e auditoria padrÃƒÂ£o.
 do $$
 declare table_name text;
 begin
@@ -159,7 +159,7 @@ begin
 end;
 $$;
 
--- Timeline automática dos principais registros.
+-- Timeline automÃƒÂ¡tica dos principais registros.
 do $$
 begin
   drop trigger if exists entity_event_candidates on public.candidates;
@@ -183,28 +183,38 @@ language sql
 stable
 security definer set search_path = ''
 as $$
-  with input as (select trim(coalesce(p_query,'')) as q), results as (
+  with input as (select trim(coalesce(p_query,'')) as q),
+results(entity_type, entity_id, title, subtitle, href, relevance) as (
     select 'candidate'::text, c.id, c.full_name, coalesce(c.email,c.phone,'Candidato'), '/app/candidatos/'||c.id,
-      greatest(similarity(c.full_name,(select q from input)), case when lower(c.email)=lower((select q from input)) then 1 else 0 end)::real
+      greatest(extensions.similarity(c.full_name,(select q from input)), case when lower(c.email)=lower((select q from input)) then 1 else 0 end)::real
     from public.candidates c where public.is_tenant_member(c.tenant_id) and ((select q from input) <> '')
-      and (c.full_name % (select q from input) or c.full_name ilike '%'||(select q from input)||'%' or c.email ilike '%'||(select q from input)||'%' or coalesce(c.phone,'') ilike '%'||(select q from input)||'%')
+      and (c.full_name OPERATOR(extensions.%) (select q from input) or c.full_name ilike '%'||(select q from input)||'%' or c.email ilike '%'||(select q from input)||'%' or coalesce(c.phone,'') ilike '%'||(select q from input)||'%')
     union all
     select 'job', j.id, j.title, coalesce(co.name,'Vaga interna'), '/app/vagas/'||j.id,
-      similarity(j.title,(select q from input))::real
+      extensions.similarity(j.title,(select q from input))::real
     from public.jobs j left join public.crm_companies co on co.id=j.company_id and co.tenant_id=j.tenant_id
-    where public.is_tenant_member(j.tenant_id) and ((select q from input) <> '') and (j.title % (select q from input) or j.title ilike '%'||(select q from input)||'%')
+    where public.is_tenant_member(j.tenant_id) and ((select q from input) <> '') and (j.title OPERATOR(extensions.%) (select q from input) or j.title ilike '%'||(select q from input)||'%')
     union all
     select 'company', c.id, c.name, coalesce(c.email,c.phone,'Cliente'), '/app/clientes/'||c.id,
-      similarity(c.name,(select q from input))::real
+      extensions.similarity(c.name,(select q from input))::real
     from public.crm_companies c where public.is_tenant_member(c.tenant_id) and ((select q from input) <> '')
-      and (c.name % (select q from input) or c.name ilike '%'||(select q from input)||'%' or coalesce(c.email,'') ilike '%'||(select q from input)||'%')
+      and (c.name OPERATOR(extensions.%) (select q from input) or c.name ilike '%'||(select q from input)||'%' or coalesce(c.email,'') ilike '%'||(select q from input)||'%')
     union all
     select 'employee', e.id, e.full_name, coalesce(e.corporate_email,e.personal_email,e.status), '/app/pessoas/'||e.id,
-      similarity(e.full_name,(select q from input))::real
+      extensions.similarity(e.full_name,(select q from input))::real
     from public.employees e where public.is_tenant_member(e.tenant_id) and ((select q from input) <> '')
-      and (e.full_name % (select q from input) or e.full_name ilike '%'||(select q from input)||'%' or coalesce(e.corporate_email,'') ilike '%'||(select q from input)||'%' or coalesce(e.personal_email,'') ilike '%'||(select q from input)||'%')
+      and (e.full_name OPERATOR(extensions.%) (select q from input) or e.full_name ilike '%'||(select q from input)||'%' or coalesce(e.corporate_email,'') ilike '%'||(select q from input)||'%' or coalesce(e.personal_email,'') ilike '%'||(select q from input)||'%')
   )
-  select * from results order by relevance desc, title limit greatest(1,least(coalesce(p_limit,30),100));
+  select
+    r.entity_type,
+    r.entity_id,
+    r.title,
+    r.subtitle,
+    r.href,
+    r.relevance
+  from results r
+  order by r.relevance desc, r.title
+  limit greatest(1, least(coalesce(p_limit,30),100));
 $$;
 
 create or replace function public.find_candidate_duplicates(p_tenant_id uuid, p_threshold real default 0.62)
@@ -214,18 +224,18 @@ stable
 security definer set search_path = ''
 as $$
   select a.id,b.id,a.full_name,b.full_name,a.email,b.email,a.phone,b.phone,
-    greatest(similarity(a.full_name,b.full_name), case when lower(a.email)=lower(b.email) then 1 else 0 end,
+    greatest(extensions.similarity(a.full_name,b.full_name), case when lower(a.email)=lower(b.email) then 1 else 0 end,
       case when nullif(regexp_replace(coalesce(a.phone,''),'\D','','g'),'') = nullif(regexp_replace(coalesce(b.phone,''),'\D','','g'),'') then .96 else 0 end)::real,
     array_remove(array[
       case when lower(a.email)=lower(b.email) then 'Mesmo e-mail' end,
       case when nullif(regexp_replace(coalesce(a.phone,''),'\D','','g'),'') = nullif(regexp_replace(coalesce(b.phone,''),'\D','','g'),'') then 'Mesmo telefone' end,
-      case when similarity(a.full_name,b.full_name)>=p_threshold then 'Nome semelhante' end
+      case when extensions.similarity(a.full_name,b.full_name)>=p_threshold then 'Nome semelhante' end
     ],null)
   from public.candidates a join public.candidates b on b.tenant_id=a.tenant_id and b.id>a.id
   where a.tenant_id=p_tenant_id and public.has_tenant_role(p_tenant_id,array['owner','admin','recruiter','hr','manager'])
     and (lower(a.email)=lower(b.email)
       or (nullif(regexp_replace(coalesce(a.phone,''),'\D','','g'),'') is not null and regexp_replace(coalesce(a.phone,''),'\D','','g')=regexp_replace(coalesce(b.phone,''),'\D','','g'))
-      or similarity(a.full_name,b.full_name)>=p_threshold)
+      or extensions.similarity(a.full_name,b.full_name)>=p_threshold)
   order by 9 desc;
 $$;
 
@@ -267,12 +277,12 @@ security definer set search_path = ''
 as $$
 begin
   insert into public.activation_items(tenant_id,item_key,label,description,href,sort_order) values
-    (p_tenant_id,'company','Complete os dados da empresa','Identidade, documento e fuso horário.','/app/configuracoes',10),
-    (p_tenant_id,'team','Convide sua equipe','Adicione responsáveis para operar o ambiente.','/app/equipe',20),
+    (p_tenant_id,'company','Complete os dados da empresa','Identidade, documento e fuso horÃƒÂ¡rio.','/app/configuracoes',10),
+    (p_tenant_id,'team','Convide sua equipe','Adicione responsÃƒÂ¡veis para operar o ambiente.','/app/equipe',20),
     (p_tenant_id,'import','Importe seus dados','Traga candidatos, pessoas, vagas ou clientes.','/app/dados',30),
-    (p_tenant_id,'career','Publique a página de carreiras','Ative a captação contínua de candidatos.','/app/ats',40),
-    (p_tenant_id,'first_job','Abra a primeira vaga','Configure o pipeline e o formulário.','/app/vagas',50),
-    (p_tenant_id,'custom_fields','Personalize os cadastros','Crie campos próprios sem alterar o código.','/app/dados#campos',60)
+    (p_tenant_id,'career','Publique a pÃƒÂ¡gina de carreiras','Ative a captaÃƒÂ§ÃƒÂ£o contÃƒÂ­nua de candidatos.','/app/ats',40),
+    (p_tenant_id,'first_job','Abra a primeira vaga','Configure o pipeline e o formulÃƒÂ¡rio.','/app/vagas',50),
+    (p_tenant_id,'custom_fields','Personalize os cadastros','Crie campos prÃƒÂ³prios sem alterar o cÃƒÂ³digo.','/app/dados#campos',60)
   on conflict(tenant_id,item_key) do nothing;
 end;
 $$;
