@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export type WorkspaceIconName = "home" | "inbox" | "calendar" | "clients" | "jobs" | "candidates" | "people" | "leave" | "performance" | "engagement" | "automations" | "reports" | "team" | "billing" | "settings";
+export type WorkspaceIconName = "home" | "inbox" | "calendar" | "clients" | "jobs" | "candidates" | "data" | "ats" | "people" | "leave" | "performance" | "engagement" | "automations" | "reports" | "team" | "billing" | "settings";
 
 export const WORKSPACE_NAV_GROUPS: Array<{ label: string; links: Array<{ href: string; label: string; icon: WorkspaceIconName }> }> = [
   {
@@ -15,6 +15,7 @@ export const WORKSPACE_NAV_GROUPS: Array<{ label: string; links: Array<{ href: s
       { href: "/app/clientes", label: "Clientes", icon: "clients" },
       { href: "/app/vagas", label: "Vagas", icon: "jobs" },
       { href: "/app/candidatos", label: "Candidatos", icon: "candidates" },
+      { href: "/app/ats", label: "ATS profissional", icon: "ats" },
     ],
   },
   {
@@ -29,6 +30,7 @@ export const WORKSPACE_NAV_GROUPS: Array<{ label: string; links: Array<{ href: s
   {
     label: "Inteligência",
     links: [
+      { href: "/app/dados", label: "Dados & importação", icon: "data" },
       { href: "/app/automacoes", label: "Automações", icon: "automations" },
       { href: "/app/relatorios", label: "Relatórios", icon: "reports" },
     ],
@@ -51,6 +53,8 @@ export function WorkspaceNavIcon({ name }: { name: WorkspaceIconName }) {
     clients: <><path d="M4 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16" /><path d="M17 9h3v12M2 21h20M8 7h2M8 11h2M8 15h2" /></>,
     jobs: <><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18M10 12v2h4v-2" /></>,
     candidates: <><circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0M16 6h5M16 10h5M17 14h4M17 18h4" /></>,
+    data: <><ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" /></>,
+    ats: <><path d="M4 4h16v16H4zM8 8h8M8 12h5M8 16h3" /><circle cx="17" cy="16" r="2" /></>,
     people: <><circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0M16 5a3 3 0 0 1 0 6M17 14a5 5 0 0 1 4 6" /></>,
     leave: <><path d="M5 4h14v16H5z" /><path d="M8 2v4M16 2v4M5 9h14M9 13l2 2 4-4" /></>,
     performance: <><path d="M4 19V9M10 19V5M16 19v-7M22 19H2" /><path d="m4 6 5-3 5 2 6-4" /></>,

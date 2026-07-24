@@ -14,7 +14,7 @@ const ACTION_LABELS: Record<string, string> = { insert: "criou", update: "atuali
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ welcome?: string; success?: string; error?: string }> }) {
   const params = await searchParams;
   const { supabase, tenant, user } = await requireWorkspace();
-  const [clients, jobs, candidates, applications, subscription, audit, activities, employees, performanceCycles, performanceGoals, performanceReviews, engagementSurveys, engagementActions, leaveRequests, viewPreferences] = await Promise.all([
+  const [clients, jobs, candidates, applications, subscription, audit, activities, employees, performanceCycles, performanceGoals, performanceReviews, engagementSurveys, engagementActions, leaveRequests, viewPreferences, activation] = await Promise.all([
     supabase.from("crm_companies").select("id", { count: "exact", head: true }).eq("tenant_id", tenant.id),
     supabase.from("jobs").select("id", { count: "exact", head: true }).eq("tenant_id", tenant.id).in("status", ["open", "paused"]),
     supabase.from("candidates").select("id", { count: "exact", head: true }).eq("tenant_id", tenant.id),
@@ -30,7 +30,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     supabase.from("engagement_action_plans").select("id,status").eq("tenant_id", tenant.id),
     supabase.from("leave_requests").select("id,status,start_date,end_date,total_days").eq("tenant_id", tenant.id),
     supabase.from("workspace_view_preferences").select("dashboard_cards,dashboard_columns").eq("tenant_id", tenant.id).eq("user_id", user.id).maybeSingle(),
+    supabase.rpc("get_activation_checklist", { p_tenant_id: tenant.id }),
   ]);
+  const activationRows = (activation.data ?? []) as Array<{ item_key:string; label:string; description:string; href:string; completed:boolean }>;
   const planData = subscription.data?.plan as unknown as { name?: string; features?: Record<string, boolean>; limits?: { active_jobs?: number | null; employees?: number | null } } | null;
   const plan = planData?.name ?? "Basic";
   const hasPerformance = planData?.features?.performance === true;
@@ -67,6 +69,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     {params.welcome && <div className="notice">Ambiente criado com sucesso. Agora você já pode cadastrar seus primeiros dados.</div>}
     {params.success && <div className="notice">{params.success}</div>}
     {params.error && <div className="notice error-notice">{params.error}</div>}
+    {activationRows.length ? <section className="activation-checklist panel"><div><small>ATIVAÇÃO DO AMBIENTE</small><h2>Faça o Prismae trabalhar com dados reais</h2><p>{activationRows.filter((item) => item.completed).length} de {activationRows.length} etapas concluídas.</p></div><div className="activation-progress"><i><b style={{ width: `${Math.round(activationRows.filter((item) => item.completed).length / activationRows.length * 100)}%` }} /></i><strong>{Math.round(activationRows.filter((item) => item.completed).length / activationRows.length * 100)}%</strong></div><div className="activation-items">{activationRows.map((item) => <Link className={item.completed ? "is-complete" : ""} href={item.href} key={item.item_key}><span>{item.completed ? "✓" : "→"}</span><div><strong>{item.label}</strong><small>{item.description}</small></div></Link>)}</div></section> : null}
     <details className="view-customizer panel"><summary><span>Personalizar visão</span><small>Escolha cards e densidade do layout</small><b>＋</b></summary><form action={saveDashboardPreferences}><div className="view-card-options">{DASHBOARD_CARD_IDS.map(card => <label key={card}><input type="checkbox" name="cards" value={card} defaultChecked={dashboardCards.includes(card)} /><span>{DASHBOARD_CARD_LABELS[card]}</span></label>)}</div><div className="view-layout-options"><label>Cards por linha<select name="columns" defaultValue={dashboardColumns}><option value="2">2 cards</option><option value="3">3 cards</option><option value="4">4 cards</option></select></label><SubmitButton pendingLabel="Salvando visão...">Salvar minha visão</SubmitButton></div></form></details>
     <section className={`metric-grid dashboard-metric-grid dashboard-columns-${dashboardColumns}`}>
       {dashboardCards.includes("clients") && <article className="metric-card"><DashboardMetricIcon kind="clients" /><small>Clientes no CRM</small><strong>{clients.count ?? 0}</strong><em>carteira comercial</em></article>}

@@ -1,0 +1,8 @@
+import Link from "next/link";
+import { requireWorkspace } from "@/lib/auth/workspace";
+const LABELS: Record<string,string> = { candidate: "Candidato", job: "Vaga", company: "Cliente", employee: "Colaborador" };
+export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const { q = "" } = await searchParams; const query = q.trim().slice(0,100); const { supabase } = await requireWorkspace();
+  const result = query ? await supabase.rpc("workspace_global_search", { p_query: query, p_limit: 50 }) : { data: [], error: null };
+  return <div className="workspace-content"><div className="page-heading"><div><h1>Busca global</h1><p>Encontre pessoas, candidatos, vagas e clientes sem navegar módulo por módulo.</p></div><span className="record-count">{result.data?.length ?? 0} resultado(s)</span></div><form className="global-search-page" method="get"><input name="q" defaultValue={query} autoFocus placeholder="Digite nome, e-mail, telefone, vaga ou empresa" /><button>Buscar</button></form>{result.error && <div className="notice error-notice">Execute a migration 010 para habilitar a busca global.</div>}<section className="panel search-results">{result.data?.length ? result.data.map((item: { entity_type:string; entity_id:string; title:string; subtitle:string; href:string }) => <Link href={item.href} key={`${item.entity_type}-${item.entity_id}`}><span>{LABELS[item.entity_type] ?? item.entity_type}</span><div><strong>{item.title}</strong><small>{item.subtitle}</small></div><b>→</b></Link>) : <div className="empty-state">{query ? "Nenhum registro encontrado." : "Digite algo para pesquisar em toda a empresa."}</div>}</section></div>;
+}
